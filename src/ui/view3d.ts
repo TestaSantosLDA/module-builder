@@ -20,6 +20,8 @@ export interface View3DHost {
   /** the camera moved: reposition the selection toolbar */
   selectionMoved(): void;
   snap(m: Mod): void;
+  /** a wall was clicked without dragging: side of the module and the point hit (plan dm), and the screen point */
+  wallClick(m: Mod, side: 'N' | 'S' | 'W' | 'E', x: number, y: number, clientX: number, clientY: number): void;
 }
 
 export interface View3D {
@@ -295,7 +297,7 @@ export function createView3D(box: HTMLElement, host: View3DHost): View3D | null 
 
   // ---------- drag and stack ----------
   const ray = new THREE.Raycaster(), ndc = new THREE.Vector2(), groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
-  let drag: { m: Mod; moved: boolean } | null = null;
+  let drag: { m: Mod; moved: boolean; side?: 'N' | 'S' | 'W' | 'E'; at?: THREE.Vector3 } | null = null;
   let press: { x: number; y: number } | null = null;
   const aim = (x: number, y: number) => { const r = renderer.domElement.getBoundingClientRect(); ndc.set((x - r.left) / r.width * 2 - 1, -(y - r.top) / r.height * 2 + 1); ray.setFromCamera(ndc, cam); };
   function place(m: Mod, x: number, y: number): void {
@@ -310,7 +312,10 @@ export function createView3D(box: HTMLElement, host: View3DHost): View3D | null 
     if (e.button !== 0) return;
     aim(e.clientX, e.clientY); press = { x: e.clientX, y: e.clientY };
     const hit = ray.intersectObjects(pickers)[0];
-    if (hit) { const m = hit.object.userData.m as Mod; host.select(m); drag = { m, moved: false }; controls.enabled = false; box.setPointerCapture(e.pointerId); host.changed(); }
+    if (hit) {
+      const m = hit.object.userData.m as Mod, n = hit.face?.normal; // pick boxes are not rotated: local normal = world normal
+      const side = !n || Math.abs(n.y) > 0.5 ? undefined : Math.abs(n.x) > 0.5 ? (n.x > 0 ? 'E' : 'W') : (n.z > 0 ? 'S' : 'N');
+      host.select(m); drag = { m, moved: false, side, at: hit.point.clone() }; controls.enabled = false; box.setPointerCapture(e.pointerId); host.changed(); }
   }, true);
   box.addEventListener('pointermove', e => {
     if (!drag || !press) return;
@@ -319,7 +324,11 @@ export function createView3D(box: HTMLElement, host: View3DHost): View3D | null 
   });
   const up = (e: PointerEvent) => {
     if (press && !drag && Math.hypot(e.clientX - press.x, e.clientY - press.y) < 5) { host.select(null); host.changed(); }
-    if (drag) { drag = null; host.changed(); }
+    if (drag) {
+      const d = drag; drag = null; host.changed();
+      // a click on a wall (no drag) opens the wall menu
+      if (!d.moved && d.side && d.at && e.type === 'pointerup' && TYPES[d.m.type].kind === 'room') host.wallClick(d.m, d.side, d.at.x * 10, d.at.z * 10, e.clientX, e.clientY);
+    }
     controls.enabled = true; press = null;
   };
   box.addEventListener('pointerup', up); box.addEventListener('pointercancel', up);

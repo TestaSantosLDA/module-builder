@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Construtor Treehouse · Jular</title>
+<title>TreeHouse Studio · Jular</title>
 <meta name="description" content="Monte a sua casa Treehouse com os módulos da Jular e peça um orçamento.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -12,7 +12,7 @@
 <body>
 <div class="app">
   <header>
-    <div class="brand">treehouse <small>construtor · engineered by JULAR</small></div>
+    <div class="brand">TreeHouse Studio <small>engineered by JULAR</small></div>
     <span class="proto">MVP · medidas provisórias</span>
     <div class="tabs" role="group" aria-label="Vista">
       <button class="tab" id="tab2d" aria-pressed="true">Planta 2D</button>
@@ -23,7 +23,9 @@
     <svg id="board" aria-label="Planta da casa"></svg>
     <div id="view3d" hidden aria-label="Vista 3D da casa"></div>
 
-    <aside class="panel palette" aria-label="Módulos">
+    <aside class="panel palette" id="palette" aria-label="Módulos">
+      <button type="button" class="ptoggle" id="pToggle" aria-expanded="true" aria-controls="pbody">Peças e casas <span aria-hidden="true">▾</span></button>
+      <div class="pbody" id="pbody">
       <div class="fam first"><h2>Casa de partida</h2>
         <div class="houses" id="houses" role="group" aria-label="Casa de partida"></div>
         <p class="fam-note" id="houseNote"></p>
@@ -33,14 +35,15 @@
         <button type="button" role="tab" id="pHouse" aria-selected="true">Desta casa</button><button type="button" role="tab" id="pAll" aria-selected="false">Todos <span id="pAllN"></span></button>
       </div>
       <div id="mods"></div>
-      <p class="hint">Arraste para mover · use os pisos à direita ou a Vista 3D para construir em altura · <kbd>R</kbd> rodar · <kbd>Del</kbd> apagar · arraste o fundo para deslocar a planta. Divisões encostadas ganham uma porta (exceto quarto com quarto e casa de banho com sala, cozinha ou deck); divisão com deck ganha porta de vidro; deck com deck fica contínuo; salas e cozinhas ficam em espaço aberto. Clique em qualquer parede para escolher o que leva: parede cheia, porta, janela pequena, janela, janela grande, janela até ao chão, porta de vidro simples ou dupla de correr, ou porta de entrada.</p>
+      <p class="hint">Arraste para mover · use os pisos à direita ou a Vista 3D para construir em altura · <kbd>R</kbd> rodar · <kbd>Del</kbd> apagar · arraste o fundo para deslocar a planta · no telemóvel ou tablet, aperte ou afaste dois dedos para afastar ou aproximar. Divisões encostadas ganham uma porta (exceto quarto com quarto e casa de banho com sala, cozinha ou deck); divisão com deck ganha porta de vidro; deck com deck fica contínuo; salas e cozinhas ficam em espaço aberto. Clique em qualquer parede para escolher o que leva: parede cheia, porta, janela pequena, janela, janela grande, janela até ao chão, porta de vidro simples ou dupla de correr, ou porta de entrada.</p>
+      </div>
     </aside>
 
     <div class="zoom"><button id="zin" aria-label="Aproximar">+</button><button id="zout" aria-label="Afastar">−</button></div>
     <button class="undo" id="undo" title="Desfazer (Ctrl+Z)" disabled>↶ Desfazer <b id="undoN">0</b></button>
     <div class="floors" id="floors" aria-label="Piso visível na planta"><small>Piso</small><button data-l="2">2</button><button data-l="1">1</button><button data-l="0" aria-pressed="true">0</button></div>
     <div class="panel finish" id="finish" hidden role="group" aria-label="Aspeto"><small>Fachada</small><button data-f="branco">Branco</button><button data-f="madeira">Madeira</button><button data-f="grafite">Grafite</button></div>
-    <p class="tip3d" id="tip3d" hidden>Arraste um módulo para cima de outro para criar um piso. Arraste o fundo para rodar a câmara, botão direito para deslocar, roda para aproximar. Ctrl+Z desfaz o último movimento.</p>
+    <p class="tip3d" id="tip3d" hidden>Clique numa parede para escolher porta ou janela; arraste um módulo para o mover, ou para cima de outro para criar um piso. Arraste o fundo para rodar a câmara, botão direito para deslocar, roda para aproximar. Ctrl+Z desfaz o último movimento.</p>
     <div class="scalebar" aria-hidden="true"><i id="sbar"></i><span>1 m</span></div>
 
     <aside class="panel summary" aria-label="Resumo">

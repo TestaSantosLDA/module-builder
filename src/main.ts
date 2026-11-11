@@ -1,4 +1,4 @@
-// Construtor Treehouse: 2D plan + 3D view, undo, and the quote request.
+// TreeHouse Studio: 2D plan + 3D view, undo, and the quote request.
 // Pure rules live in src/model (tested); this file is the browser UI.
 import './style.css';
 import { CATEGORIES, MAX_LEVEL, TYPES, type Mod, type TypeId } from './model/catalog';
@@ -82,6 +82,14 @@ function renderPalette(): void {
 }
 $('pHouse').onclick = () => { paletteAll = false; renderPalette(); };
 $('pAll').onclick = () => { paletteAll = true; renderPalette(); };
+// on phones and tablets the parts menu folds away to leave room for the plan
+const palette = $('palette'), pToggle = $('pToggle');
+function setPaletteOpen(open: boolean): void {
+  palette.classList.toggle('collapsed', !open); pToggle.setAttribute('aria-expanded', String(open));
+  try { localStorage.setItem('treehouse-pecas', open ? '1' : '0'); } catch { /* storage blocked */ }
+}
+pToggle.onclick = () => setPaletteOpen(palette.classList.contains('collapsed'));
+try { if (localStorage.getItem('treehouse-pecas') === '0') setPaletteOpen(false); } catch { /* storage blocked */ }
 
 // ---------- geometry helpers ----------
 const toWorld = (cx: number, cy: number) => { const r = svg.getBoundingClientRect(); return { x: (cx - r.left - view.tx) / view.s, y: (cy - r.top - view.ty) / view.s }; };
@@ -244,11 +252,26 @@ function placeSelbar(): void {
 }
 
 // ---------- 2D interactions ----------
+// two fingers on the plan: pinch to zoom out, spread to zoom in, and move together to pan
+const touches = new Map<number, { x: number; y: number }>();
+let wallPress: { t: WallTarget | undefined; x: number; y: number; id: number } | null = null;
+let pinch: { d: number; mx: number; my: number } | null = null;
+const pinchState = () => {
+  const [a, b] = [...touches.values()], r = svg.getBoundingClientRect();
+  return { d: Math.max(1, Math.hypot(a.x - b.x, a.y - b.y)), mx: (a.x + b.x) / 2 - r.left, my: (a.y + b.y) / 2 - r.top };
+};
 svg.addEventListener('pointerdown', e => {
+  if (e.pointerType === 'touch') touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (touches.size === 2) { // second finger: stop dragging or panning and start a pinch
+    drag = null; pan = null; wallPress = null; svg.classList.remove('panning'); closeWallMenu();
+    svg.setPointerCapture(e.pointerId); pinch = pinchState(); return;
+  }
+  if (touches.size > 2 || pinch) return;
   const dw = (e.target as Element).closest('.dw') as SVGElement | null;
   closeWallMenu();
-  if (dw) { const t = wallTargets[Number(dw.dataset.i)]; if (t) openWallMenu(t, e.clientX, e.clientY); return; }
-  const g = (e.target as Element).closest('g.m') as SVGGElement | null;
+  // a wall opens its menu on release, if the finger or mouse did not move (so a wall can still start a pan or a pinch)
+  wallPress = dw ? { t: wallTargets[Number(dw.dataset.i)], x: e.clientX, y: e.clientY, id: e.pointerId } : null;
+  const g = dw ? null : (e.target as Element).closest('g.m') as SVGGElement | null;
   if (g) {
     const m = mods.find(x => x.id === Number(g.dataset.id))!;
     sel = m;
@@ -260,13 +283,29 @@ svg.addEventListener('pointerdown', e => {
   svg.classList.add('panning'); svg.setPointerCapture(e.pointerId); render();
 });
 svg.addEventListener('pointermove', e => {
+  if (touches.has(e.pointerId)) touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (pinch) {
+    if (touches.size < 2) return;
+    const p = pinchState();
+    view.tx += p.mx - pinch.mx; view.ty += p.my - pinch.my;
+    const k = p.d / pinch.d; pinch = p; zoomAt(p.mx, p.my, k);
+    return;
+  }
   if (drag) {
     const w = toWorld(e.clientX, e.clientY);
     drag.m.x = snap(w.x - drag.dx); drag.m.y = snap(w.y - drag.dy);
     snapToNeighbours(mods, drag.m); drag.moved = true; render();
   } else if (pan) { view.tx = pan.tx + e.clientX - pan.x; view.ty = pan.ty + e.clientY - pan.y; render(); }
 });
-const endDrag = () => { if (drag || pan) { drag = null; pan = null; svg.classList.remove('panning'); render(); } };
+const endDrag = (e: PointerEvent) => {
+  touches.delete(e.pointerId);
+  const wp = wallPress; wallPress = null;
+  if (wp?.t && e.type === 'pointerup' && wp.id === e.pointerId && !pinch && Math.hypot(e.clientX - wp.x, e.clientY - wp.y) < 8) {
+    pan = null; svg.classList.remove('panning'); openWallMenu(wp.t, e.clientX, e.clientY); return;
+  }
+  if (pinch) { if (touches.size < 2) pinch = null; return; }
+  if (drag || pan) { drag = null; pan = null; svg.classList.remove('panning'); render(); }
+};
 svg.addEventListener('pointerup', endDrag);
 svg.addEventListener('pointercancel', endDrag);
 svg.addEventListener('wheel', e => { e.preventDefault(); const r = svg.getBoundingClientRect(); zoomAt(e.clientX - r.left, e.clientY - r.top, e.deltaY < 0 ? 1.12 : 1 / 1.12); }, { passive: false });
@@ -418,7 +457,16 @@ function ensure3D(): View3D | null {
       changed: render,
       selectionMoved: placeSelbar,
       snap: m => snapToNeighbours(mods, m),
+      wallClick: (m, side, x, y, cx, cy) => {
+        const ow = outWalls(mods, m).find(w => w.side === side);
+        if (ow) { openWallMenu({ out: ow }, cx, cy); return; }
+        const f = fp(m), sideOf = (d: Door) => (d.vertical ? (Math.abs(d.x - f.x) < 0.5 ? 'W' : 'E') : (Math.abs(d.y - f.y) < 0.5 ? 'N' : 'S'));
+        const near = connections(mods).filter(d => (d.a === m || d.b === m) && sideOf(d) === side)
+          .map(d => ({ d, gap: Math.max(0, Math.abs(d.vertical ? y - d.y : x - d.x) - d.len / 2) })).sort((a, b) => a.gap - b.gap)[0];
+        if (near && near.gap < 2) openWallMenu({ shared: near.d }, cx, cy);
+      },
     });
+    $('view3d').addEventListener('pointerdown', closeWallMenu, true);
     if (!view3d) { const t = $<HTMLButtonElement>('tab3d'); t.disabled = true; t.title = 'Não foi possível abrir o 3D neste navegador'; return null; }
     view3d.setFinish(finish);
   }
