@@ -34,9 +34,9 @@ describe('automatic doors', () => {
   it('ignores modules on different floors', () => {
     expect(doors([M('quarto', 0, 0), M('quarto', 28, 0, 1)])).toHaveLength(0);
   });
-  it('the Riga T2 gets 11 doors (suite–quarto is a wall)', () => {
+  it('the Riga T2 gets 10 openings, as in the catalogue', () => {
     let n = 1;
-    expect(doors(rigaT2(() => n++))).toHaveLength(11);
+    expect(doors(rigaT2(() => n++))).toHaveLength(10);
   });
 });
 
@@ -85,7 +85,7 @@ describe('summary', () => {
   it('counts the Riga T2', () => {
     let n = 1;
     const s = summarize(rigaT2(() => n++));
-    expect(s).toMatchObject({ floors: 1, rooms: 6, area: 69, deck: 33, doors: 11, msgs: [] });
+    expect(s).toMatchObject({ floors: 1, rooms: 6, area: 69, deck: 33, doors: 10, msgs: [] });
   });
 });
 
