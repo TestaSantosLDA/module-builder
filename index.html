@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="pt">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Construtor Treehouse · Jular</title>
+<meta name="description" content="Monte a sua casa Treehouse com os módulos da Jular e peça um orçamento.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@400;500;600;700&display=swap">
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">treehouse <small>construtor · engineered by JULAR</small></div>
+    <span class="proto">MVP · medidas provisórias</span>
+    <div class="tabs" role="group" aria-label="Vista">
+      <button class="tab" id="tab2d" aria-pressed="true">Planta 2D</button>
+      <button class="tab" id="tab3d" aria-pressed="false">Vista 3D</button>
+    </div>
+  </header>
+  <main id="main">
+    <svg id="board" aria-label="Planta da casa"></svg>
+    <div id="view3d" hidden aria-label="Vista 3D da casa"></div>
+
+    <aside class="panel palette" aria-label="Módulos">
+      <h2>Módulos · arraste para a planta</h2>
+      <div class="mods" id="mods"></div>
+      <div class="fam">Casa de partida: Treehouse Riga T2 (70 m², catálogo p. 37), partida nas suas peças.
+        <div class="ghost-list"><span>Riga T2 ✓</span><span>Spot T0</span><span>SW T1</span><span>Douro T2</span><span>Original T1A</span></div>
+      </div>
+      <p class="hint">Arraste para mover · use os pisos à direita ou a Vista 3D para construir em altura · <kbd>R</kbd> rodar · <kbd>Del</kbd> apagar · arraste o fundo para deslocar a planta. Divisões encostadas ganham uma porta; divisão com deck ganha porta de vidro; deck com deck fica contínuo; sala com cozinha fica em espaço aberto.</p>
+    </aside>
+
+    <div class="zoom"><button id="zin" aria-label="Aproximar">+</button><button id="zout" aria-label="Afastar">−</button></div>
+    <button class="undo" id="undo" title="Desfazer (Ctrl+Z)" disabled>↶ Desfazer <b id="undoN">0</b></button>
+    <div class="floors" id="floors" aria-label="Piso visível na planta"><small>Piso</small><button data-l="2">2</button><button data-l="1">1</button><button data-l="0" aria-pressed="true">0</button></div>
+    <div class="panel finish" id="finish" hidden role="group" aria-label="Aspeto"><small>Fachada</small><button data-f="branco">Branco</button><button data-f="madeira">Madeira</button><button data-f="grafite">Grafite</button></div>
+    <p class="tip3d" id="tip3d" hidden>Arraste um módulo para cima de outro para criar um piso. Arraste o fundo para rodar a câmara, botão direito para deslocar, roda para aproximar. Ctrl+Z desfaz o último movimento.</p>
+    <div class="scalebar" aria-hidden="true"><i id="sbar"></i><span>1 m</span></div>
+
+    <aside class="panel summary" aria-label="Resumo">
+      <h2>A sua casa</h2>
+      <div class="stats">
+        <div class="stat"><em id="sMods">0</em><small>módulos</small></div>
+        <div class="stat"><em id="sArea">0</em><small>m² interiores</small></div>
+        <div class="stat"><em id="sDeck">0</em><small>m² deck</small></div>
+        <div class="stat"><em id="sDoors">0</em><small>portas criadas</small></div>
+        <div class="stat"><em id="sFloors">1</em><small>pisos</small></div>
+      </div>
+      <p class="warn" id="warn" hidden></p>
+      <button class="btn primary" id="quote">Pedir orçamento</button>
+      <div class="row"><button class="btn" id="example">Repor Riga T2</button><button class="btn" id="clear">Limpar</button></div>
+    </aside>
+
+    <div class="panel selbar" id="selbar" hidden>
+      <button id="bUp" title="Subir um piso">▲ Piso</button><button id="bDown" title="Descer um piso">▼ Piso</button><button id="bRot">↻ Rodar</button><button id="bDup">Duplicar</button><button id="bDel">Apagar</button>
+    </div>
+
+    <div class="modal" id="modal" hidden><div class="dialog" id="dlg" role="dialog" aria-modal="true" aria-labelledby="dlgTitle"></div></div>
+  </main>
+</div>
+<script type="module" src="/src/main.ts"></script>
+</body>
+</html>
