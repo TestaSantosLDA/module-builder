@@ -1,4 +1,5 @@
 import type { Mod, TypeId } from './catalog.js';
+import { CATALOG_HOUSES } from './catalog-houses.js';
 
 export type Family = 'Spot' | 'SW' | 'Riga' | 'Douro' | 'Original';
 export const FAMILIES: Family[] = ['Spot', 'SW', 'Riga', 'Douro', 'Original'];
@@ -19,7 +20,7 @@ export interface House {
 
 const P = (type: TypeId, x: number, y: number, rot: Mod['rot'] = 0, z = 0): Omit<Mod, 'id'> => ({ type, x, y, rot, z });
 
-export const HOUSES: House[] = [
+export const HOUSES: House[] = ([
   {
     id: 'riga-t2', family: 'Riga', label: 'T2', name: 'Treehouse Riga T2', page: 37, catalogArea: '70 m²',
     plan: [
@@ -28,7 +29,8 @@ export const HOUSES: House[] = [
       P('deckL', -9, 70), P('suite', 28, 70), P('quarto', 66, 70),
     ],
   },
-];
+  ...(CATALOG_HOUSES as House[]),
+] as House[]).sort((a, b) => FAMILIES.indexOf(a.family) - FAMILIES.indexOf(b.family) || a.label.localeCompare(b.label));
 
 export const DEFAULT_HOUSE = 'riga-t2';
 export const houseById = (id: string | null | undefined) => HOUSES.find(h => h.id === id);

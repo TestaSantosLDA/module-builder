@@ -1,7 +1,7 @@
 // Construtor Treehouse: 2D plan + 3D view, undo, and the quote request.
 // Pure rules live in src/model (tested); this file is the browser UI.
 import './style.css';
-import { MAX_LEVEL, TYPES, type Mod, type TypeId } from './model/catalog';
+import { CATEGORIES, MAX_LEVEL, TYPES, type Mod, type TypeId } from './model/catalog';
 import { doors, footprint as fp, level as lv, problems, snapToNeighbours, summarize, type Door } from './model/geometry';
 import { History } from './model/history';
 import { DEFAULT_HOUSE, FAMILIES, HOUSES, houseById, placeHouse } from './model/houses';
@@ -39,7 +39,9 @@ const m1 = (dm: number) => (dm / 10).toFixed(1).replace('.', ',');
 
 // ---------- palette ----------
 const modsBox = $('mods');
-for (const [k, t] of Object.entries(TYPES) as [TypeId, (typeof TYPES)[TypeId]][]) {
+let paletteAll = false;
+function modButton(k: TypeId): HTMLButtonElement {
+  const t = TYPES[k];
   const b = document.createElement('button');
   b.className = 'mod'; b.type = 'button'; b.dataset.type = k;
   const s = document.createElementNS(NS, 'svg');
@@ -50,8 +52,33 @@ for (const [k, t] of Object.entries(TYPES) as [TypeId, (typeof TYPES)[TypeId]][]
   interior(g, k, t.w, t.h);
   b.appendChild(s);
   b.insertAdjacentHTML('beforeend', `<b>${t.name}</b><span>${m1(t.w)}×${m1(t.h)} m<br>${Math.round(t.w * t.h / 100)} m²</span>`);
-  modsBox.appendChild(b);
+  return b;
 }
+const ALL_TYPES = Object.keys(TYPES) as TypeId[];
+$('pAllN').textContent = `(${ALL_TYPES.length})`;
+/** "Desta casa": the pieces of the start house plus what is on the plan now, and stairs. "Todos": every type by category. */
+function renderPalette(): void {
+  $('pHouse').setAttribute('aria-selected', String(!paletteAll)); $('pAll').setAttribute('aria-selected', String(paletteAll));
+  modsBox.innerHTML = '';
+  if (!paletteAll) {
+    const used = new Set<TypeId>([...(houseById(houseId)?.plan.map(p => p.type) ?? []), ...mods.map(m => m.type), 'escada']);
+    const grid = document.createElement('div'); grid.className = 'mods';
+    for (const c of CATEGORIES) for (const k of ALL_TYPES) if (used.has(k) && TYPES[k].cat === c.id) grid.appendChild(modButton(k));
+    modsBox.appendChild(grid);
+    return;
+  }
+  for (const c of CATEGORIES) {
+    const ks = ALL_TYPES.filter(k => TYPES[k].cat === c.id);
+    if (!ks.length) continue;
+    const d = document.createElement('details'); d.className = 'cat'; d.open = c.id === 'sala';
+    d.innerHTML = `<summary>${c.name} <small>${ks.length}</small></summary>`;
+    const grid = document.createElement('div'); grid.className = 'mods';
+    ks.forEach(k => grid.appendChild(modButton(k)));
+    d.appendChild(grid); modsBox.appendChild(d);
+  }
+}
+$('pHouse').onclick = () => { paletteAll = false; renderPalette(); };
+$('pAll').onclick = () => { paletteAll = true; renderPalette(); };
 
 // ---------- geometry helpers ----------
 const toWorld = (cx: number, cy: number) => { const r = svg.getBoundingClientRect(); return { x: (cx - r.left - view.tx) / view.s, y: (cy - r.top - view.ty) / view.s }; };
@@ -295,7 +322,7 @@ function loadHouse(id: string): void {
   const h = houseById(id); if (!h) return;
   houseId = id;
   try { localStorage.setItem(HOUSE_KEY, id); } catch { /* storage blocked */ }
-  curLevel = 0; mods = placeHouse(h, () => nextId++); sel = null; showHouse(); fit();
+  curLevel = 0; mods = placeHouse(h, () => nextId++); sel = null; showHouse(); renderPalette(); fit();
 }
 const loadRiga = () => loadHouse(houseId);
 function fit(): void {
@@ -385,6 +412,7 @@ let loaded: Mod[] | null = null;
 try { loaded = parsePlan(JSON.parse(localStorage.getItem(STORE) || 'null')); } catch { /* ignore */ }
 showHouse();
 requestAnimationFrame(() => {
+  renderPalette();
   if (loaded && loaded.length) { mods = loaded; nextId = Math.max(...mods.map(m => m.id)) + 1; fit(); }
   else loadRiga();
 });

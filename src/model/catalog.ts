@@ -1,7 +1,17 @@
 // Module catalogue. Units are decimetres (1 unit = 10 cm).
 // Sizes are PROVISIONAL: estimated from the Riga T2 plan (catalogue p. 37) until Jular sends real dimensions.
 
+import { EXTRA_TYPES } from './catalog-houses.js';
+
 export type Kind = 'room' | 'deck';
+/** Palette group. */
+export type Category = 'sala' | 'quarto' | 'wc' | 'circ' | 'deck' | 'escada';
+export const CATEGORIES: { id: Category; name: string }[] = [
+  { id: 'sala', name: 'Salas e cozinhas' }, { id: 'quarto', name: 'Quartos' }, { id: 'wc', name: 'Casas de banho e entradas' },
+  { id: 'circ', name: 'Circulação e outros' }, { id: 'deck', name: 'Decks' }, { id: 'escada', name: 'Escadas' },
+];
+/** Base types whose plan sketch other types can reuse. */
+export type SketchId = 'sala' | 'cozinha' | 'entrada' | 'quarto' | 'suite' | 'escada' | 'deck';
 
 export interface ModuleType {
   name: string;
@@ -10,27 +20,36 @@ export interface ModuleType {
   /** depth along y before rotation, in dm */
   h: number;
   kind: Kind;
+  cat: Category;
+  /** furniture sketch drawn on the plan (defaults to none) */
+  sketch?: SketchId;
   stairs?: boolean;
 }
 
-export const TYPES = {
-  sala: { name: 'Sala', w: 38, h: 35, kind: 'room' },
-  cozinha: { name: 'Cozinha', w: 28, h: 35, kind: 'room' },
-  entrada: { name: 'Entrada + WC', w: 38, h: 35, kind: 'room' },
-  quarto: { name: 'Quarto', w: 28, h: 35, kind: 'room' },
-  suite: { name: 'Quarto opcional + WC', w: 38, h: 35, kind: 'room' },
-  livre: { name: 'Módulo livre', w: 38, h: 35, kind: 'room' },
-  escada: { name: 'Escadas', w: 28, h: 35, kind: 'room', stairs: true },
-  deck: { name: 'Deck', w: 28, h: 35, kind: 'deck' },
-  deckL: { name: 'Deck grande', w: 37, h: 35, kind: 'deck' },
+const BASE_TYPES = {
+  sala: { name: 'Sala', w: 38, h: 35, kind: 'room', cat: 'sala', sketch: 'sala' },
+  cozinha: { name: 'Cozinha', w: 28, h: 35, kind: 'room', cat: 'sala', sketch: 'cozinha' },
+  entrada: { name: 'Entrada + WC', w: 38, h: 35, kind: 'room', cat: 'wc', sketch: 'entrada' },
+  quarto: { name: 'Quarto', w: 28, h: 35, kind: 'room', cat: 'quarto', sketch: 'quarto' },
+  suite: { name: 'Quarto opcional + WC', w: 38, h: 35, kind: 'room', cat: 'quarto', sketch: 'suite' },
+  livre: { name: 'Módulo livre', w: 38, h: 35, kind: 'room', cat: 'circ' },
+  escada: { name: 'Escadas', w: 28, h: 35, kind: 'room', cat: 'escada', sketch: 'escada', stairs: true },
+  deck: { name: 'Deck', w: 28, h: 35, kind: 'deck', cat: 'deck', sketch: 'deck' },
+  deckL: { name: 'Deck grande', w: 37, h: 35, kind: 'deck', cat: 'deck', sketch: 'deck' },
 } as const satisfies Record<string, ModuleType>;
+
+/** Base modules plus the ones found in the catalogue houses (src/model/catalog-houses.ts). */
+export const TYPES: Record<Extract<keyof typeof BASE_TYPES | keyof typeof EXTRA_TYPES, string>, ModuleType> = { ...BASE_TYPES, ...EXTRA_TYPES };
 
 export type TypeId = keyof typeof TYPES;
 
 export const isTypeId = (t: unknown): t is TypeId => typeof t === 'string' && Object.prototype.hasOwnProperty.call(TYPES, t);
 
-/** Pairs that join as open plan: no wall, no door. */
-export const OPEN_PLAN = new Set(['cozinha|sala', 'sala|cozinha']);
+/** A kitchen next to a living room joins as open plan: no wall, no door. */
+export const isOpenPlan = (a: TypeId, b: TypeId): boolean => {
+  const sa = TYPES[a].sketch, sb = TYPES[b].sketch;
+  return (sa === 'cozinha' && sb === 'sala') || (sa === 'sala' && sb === 'cozinha');
+};
 
 /** Storey height in dm. */
 export const STOREY = 30;

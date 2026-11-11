@@ -1,4 +1,4 @@
-import { MAX_LEVEL, MIN_DOOR_WALL, OPEN_PLAN, TYPES, type Mod } from './catalog.js';
+import { isOpenPlan, MAX_LEVEL, MIN_DOOR_WALL, TYPES, type Mod } from './catalog.js';
 
 export interface Rect { x: number; y: number; w: number; h: number }
 
@@ -71,7 +71,7 @@ export function doors(mods: readonly Mod[]): Door[] {
     const di = kindOf(mi) === 'deck', dj = kindOf(mj) === 'deck';
     if (di && dj) continue;
     const a = footprint(mi), b = footprint(mj);
-    const open = OPEN_PLAN.has(mi.type + '|' + mj.type), glass = di || dj;
+    const open = isOpenPlan(mi.type, mj.type), glass = di || dj;
     const base = { open, glass, z: level(mi), a: mi, b: mj };
     if (a.x + a.w === b.x || b.x + b.w === a.x) {
       const ov = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y);
@@ -106,7 +106,7 @@ export function problems(mods: readonly Mod[]): Problems {
   }
   if (floating) msgs.push('Há módulos no ar: um piso de cima tem de assentar em divisões do piso de baixo.');
   for (let l = 1; l <= MAX_LEVEL; l++)
-    if (mods.some(m => level(m) === l) && !mods.some(m => level(m) === l - 1 && 'stairs' in TYPES[m.type]))
+    if (mods.some(m => level(m) === l) && !mods.some(m => level(m) === l - 1 && TYPES[m.type].stairs))
       msgs.push(`Falta uma escada no piso ${l - 1} para subir ao piso ${l}.`);
   return { bad, msgs };
 }

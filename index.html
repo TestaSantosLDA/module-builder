@@ -24,12 +24,15 @@
     <div id="view3d" hidden aria-label="Vista 3D da casa"></div>
 
     <aside class="panel palette" aria-label="Módulos">
-      <h2>Módulos · arraste para a planta</h2>
-      <div class="mods" id="mods"></div>
-      <div class="fam"><h2>Casa de partida</h2>
+      <div class="fam first"><h2>Casa de partida</h2>
         <div class="houses" id="houses" role="group" aria-label="Casa de partida"></div>
         <p class="fam-note" id="houseNote"></p>
       </div>
+      <h2 class="mods-h">Módulos · arraste para a planta</h2>
+      <div class="ptabs" role="tablist" aria-label="Que módulos mostrar">
+        <button type="button" role="tab" id="pHouse" aria-selected="true">Desta casa</button><button type="button" role="tab" id="pAll" aria-selected="false">Todos <span id="pAllN"></span></button>
+      </div>
+      <div id="mods"></div>
       <p class="hint">Arraste para mover · use os pisos à direita ou a Vista 3D para construir em altura · <kbd>R</kbd> rodar · <kbd>Del</kbd> apagar · arraste o fundo para deslocar a planta. Divisões encostadas ganham uma porta; divisão com deck ganha porta de vidro; deck com deck fica contínuo; sala com cozinha fica em espaço aberto.</p>
     </aside>
 
