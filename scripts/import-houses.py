@@ -53,6 +53,12 @@ for hid in ids:
     area = (m.group(1) + ' m²') if m else d['catalogArea']
     label = d['name'].split()[-1]
     plan = [{**p, 'type': RENAME.get((hid, p['type']), p['type'])} for p in d['modules']]
+    # door ↔ wall corrections checked against the catalogue: pairs of plan indices
+    pf = src / 'verificacao' / f'{hid}.portas.json'
+    if pf.exists():
+        for i, j in json.loads(pf.read_text())['flip']:
+            if not (0 <= i < len(plan) and 0 <= j < len(plan)): sys.exit(f'{pf}: bad index pair {i},{j}')
+            plan[i].setdefault('flip', []).append(j)
     houses.append({'id': hid, 'family': d['family'], 'label': label, 'name': d['name'], 'page': d['page'], 'catalogArea': area, 'plan': plan})
 
 def js(v): return json.dumps(v, ensure_ascii=False)
@@ -66,7 +72,7 @@ for k, t in sorted(types.items(), key=lambda kv: (list(CAT).index(CAT_OF[kv[0]])
     c = CAT_OF[k]; sk = SKETCH_OVERRIDE.get(k, SKETCH[c])
     out.append(f"  {k}: {{ name: {js(t['name'])}, w: {t['w']}, h: {t['h']}, kind: {js(t['kind'])}, cat: {js(c)}{', sketch: ' + js(sk) if sk else ''}{', pergola: true' if t.get('pergola') else ''} }},")
 out += ['} as const satisfies Record<string, ModuleType>;', '',
-        'export interface CatalogHouse { id: string; family: string; label: string; name: string; page: number; catalogArea: string; plan: { type: string; x: number; y: number; rot: number; z: number }[] }', '',
+        'export interface CatalogHouse { id: string; family: string; label: string; name: string; page: number; catalogArea: string; plan: { type: string; x: number; y: number; rot: number; z: number; flip?: number[] }[] }', '',
         'export const CATALOG_HOUSES: CatalogHouse[] = [']
 for h in houses:
     out.append('  ' + js(h) + ',')
