@@ -1,4 +1,4 @@
-import type { Mod, TypeId } from './catalog';
+import type { Mod, TypeId } from './catalog.js';
 
 /** Treehouse Riga T2 (catalogue p. 37, 70 m²) split into its pieces. Positions in dm. */
 export function rigaT2(nextId: () => number): Mod[] {

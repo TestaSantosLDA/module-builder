@@ -1,4 +1,4 @@
-import { isTypeId, MAX_LEVEL, type Mod } from './catalog';
+import { isTypeId, MAX_LEVEL, type Mod } from './catalog.js';
 
 export const MAX_MODULES = 60;
 

@@ -1,7 +1,7 @@
 // POST /api/quote — sends a quote request (or extra details) to the Jular sales team via Resend.
 // Env: RESEND_API_KEY, QUOTE_TO (sales address), QUOTE_FROM (verified sender; defaults to Resend's test sender).
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { detailsEmail, newRef, parseQuote, salesEmail } from '../src/model/quote';
+import { detailsEmail, newRef, parseQuote, salesEmail } from '../src/model/quote.js';
 
 const DEFAULT_FROM = 'Construtor Treehouse <onboarding@resend.dev>';
 
