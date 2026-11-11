@@ -131,10 +131,15 @@ function render2D(bad: Set<Mod>, ds: Door[]): void {
   for (const d of ds.filter(d => d.z === curLevel)) {
     const BG = { stroke: 'var(--paper-deep)', 'stroke-width': 6, 'vector-effect': 'non-scaling-stroke' };
     if (d.open || d.glass) {
-      const hl = d.open ? d.len / 2 - 1.5 : Math.min(9, d.len / 2 - 1.5);
+      const single = d.glass && !d.open && d.len < 22;
+      const hl = d.open ? d.len / 2 - 1.5 : single ? Math.min(4.5, d.len / 2 - 1) : Math.min(9, d.len / 2 - 1.5);
       if (d.vertical) el('line', { ...BG, x1: d.x, y1: d.y - hl, x2: d.x, y2: d.y + hl }, world);
       else el('line', { ...BG, x1: d.x - hl, y1: d.y, x2: d.x + hl, y2: d.y }, world);
-      if (d.glass) {
+      if (single) {
+        const G = { stroke: '#7fd3ff', 'stroke-width': 1.4, 'vector-effect': 'non-scaling-stroke' };
+        if (d.vertical) el('line', { ...G, x1: d.x, y1: d.y - hl, x2: d.x, y2: d.y + hl }, world);
+        else el('line', { ...G, x1: d.x - hl, y1: d.y, x2: d.x + hl, y2: d.y }, world);
+      } else if (d.glass) {
         const G = { stroke: '#7fd3ff', 'stroke-width': 1.4, 'vector-effect': 'non-scaling-stroke' };
         if (d.vertical) { el('line', { ...G, x1: d.x - 0.5, y1: d.y - hl, x2: d.x - 0.5, y2: d.y + 1 }, world); el('line', { ...G, x1: d.x + 0.5, y1: d.y - 1, x2: d.x + 0.5, y2: d.y + hl }, world); }
         else { el('line', { ...G, x1: d.x - hl, y1: d.y - 0.5, x2: d.x + 1, y2: d.y - 0.5 }, world); el('line', { ...G, x1: d.x - 1, y1: d.y + 0.5, x2: d.x + hl, y2: d.y + 0.5 }, world); }

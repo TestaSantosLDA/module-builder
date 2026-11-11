@@ -54,7 +54,7 @@ const UNIT: Partial<Record<Mod['type'], [string, number][]>> = {
 /** Opening size of each kit piece, [width, height] m. */
 const UW: Record<string, [number, number]> = {
   W_sala: [2.4, 2.2], W_sala2: [1.6, 1.6], W_quarto: [1.2, 1.2], W_cozinha: [1.4, 1.0], W_wc: [0.6, 0.6], W_escada: [0.5, 2.0],
-  W_livre: [1.4, 1.4], D_entrada: [1.0, 2.2], G_240: [2.4, 2.3], G_180: [1.8, 2.3],
+  W_livre: [1.4, 1.4], D_entrada: [1.0, 2.2], G_240: [2.4, 2.3], G_180: [1.8, 2.3], G_090: [0.9, 2.3],
 };
 
 const noRay = <O extends THREE.Object3D>(o: O): O => { o.traverse(n => { n.raycast = () => {}; }); return o; };
@@ -64,6 +64,23 @@ function boxAt(w: number, h: number, d: number, mat: THREE.Material, x: number, 
 }
 function placeAt<O extends THREE.Object3D>(obj: O, cx: number, y: number, cz: number, nx: number, nz: number, off: number): O {
   const r = Math.atan2(nx, nz); obj.rotation.y = r; obj.position.set(cx + Math.cos(r) * off, y, cz - Math.sin(r) * off); return obj;
+}
+/** Glass door for a room–deck wall of this length (dm): wide, standard, or a single leaf on short walls. */
+export const glassDoor = (len: number) => (len >= 29 ? 'G_240' : len >= 22 ? 'G_180' : 'G_090');
+/** Single-leaf glass door, 0.9 m, built in the same frame position and materials as the 1.8 m kit door. */
+function singleGlassDoor(ref: THREE.Object3D): THREE.Object3D {
+  const c = ref.clone(true); c.position.set(0, 0, 0); c.rotation.set(0, 0, 0); c.updateMatrixWorld(true);
+  const bb = new THREE.Box3().setFromObject(c), z = (bb.min.z + bb.max.z) / 2, y0 = bb.min.y, H = bb.max.y - bb.min.y;
+  let frame: THREE.Material | undefined, glass: THREE.Material | undefined;
+  c.traverse(n => { const m = (n as THREE.Mesh).material as THREE.Material | undefined; if (!m) return; if (/vidro/.test(m.name)) glass = m; else if (/alu/.test(m.name)) frame = m; });
+  frame ??= new THREE.MeshStandardMaterial({ color: 0x2b2f34, roughness: 0.5, metalness: 0.6 }); glass ??= frame;
+  const g = new THREE.Group(), W = 0.9, F = 0.06, D = 0.07;
+  boxAt(F, H, D, frame, -W / 2 + F / 2, y0 + H / 2, z, g); boxAt(F, H, D, frame, W / 2 - F / 2, y0 + H / 2, z, g);
+  boxAt(W, F, D, frame, 0, y0 + H - F / 2, z, g); boxAt(W, F, D, frame, 0, y0 + F / 2, z, g);
+  boxAt(W - 2 * F, H - 2 * F, 0.012, glass, 0, y0 + H / 2, z, g);
+  boxAt(0.02, 0.5, 0.03, frame, W / 2 - F - 0.06, y0 + 1.05, z + D / 2 + 0.01, g);
+  g.traverse(n => { if ((n as THREE.Mesh).isMesh) n.castShadow = true; });
+  return g;
 }
 function shadowTexture(): THREE.Texture {
   const c = document.createElement('canvas'); c.width = c.height = 128; const x = c.getContext('2d')!;
@@ -133,6 +150,7 @@ export function createView3D(box: HTMLElement, host: View3DHost): View3D | null 
   Object.assign(M.deck, { map: tex('deck_cor.jpg', true, 1, 1), normalMap: tex('deck_normal.png', false, 1, 1), aoMap: tex('deck_ao.jpg', false, 1, 1) });
   new GLTFLoader().load(host.kitUrl + 'kit.glb', g => {
     for (const o of g.scene.children) { units[o.name] = o; o.traverse(n => { if ((n as THREE.Mesh).isMesh) n.castShadow = true; n.raycast = () => {}; }); }
+    if (units.G_180) units.G_090 = singleGlassDoor(units.G_180);
     host.changed();
   }, undefined, err => console.warn('Kit 3D não carregou', err));
 
@@ -166,7 +184,7 @@ export function createView3D(box: HTMLElement, host: View3DHost): View3D | null 
       if (dd.a !== m && dd.b !== m) continue;
       const k: keyof typeof S = dd.vertical ? (Math.abs(dd.x - f.x) < 0.5 ? 'W' : 'E') : (Math.abs(dd.y - f.y) < 0.5 ? 'N' : 'S');
       const off = local(k, dd.x / 10, dd.y / 10);
-      if (dd.glass) { const u = dd.len >= 29 ? 'G_240' : 'G_180'; S[k].H.push({ u, x: off, y: 0, w: UW[u][0], h: UW[u][1] }); }
+      if (dd.glass) { const u = glassDoor(dd.len); S[k].H.push({ u, x: off, y: 0, w: UW[u][0], h: UW[u][1] }); }
       else if (dd.open) S[k].H.push({ x: off, y: 0, w: dd.len / 10 - 0.3, h: WH - FL - ROOFT - 0.05 });
       else S[k].H.push({ x: off, y: 0, w: 0.9, h: 2.1 });
     }
