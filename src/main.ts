@@ -1,10 +1,10 @@
 // Construtor Treehouse: 2D plan + 3D view, undo, and the quote request.
 // Pure rules live in src/model (tested); this file is the browser UI.
 import './style.css';
-import { MAX_LEVEL, TYPES, type Mod, type TypeId } from './model/catalog';
-import { doors, footprint as fp, level as lv, problems, snapToNeighbours, summarize, type Door } from './model/geometry';
+import { CATEGORIES, MAX_LEVEL, TYPES, type Mod, type TypeId } from './model/catalog';
+import { connections, doors, toggleWall, footprint as fp, level as lv, problems, snapToNeighbours, summarize, type Door } from './model/geometry';
 import { History } from './model/history';
-import { rigaT2 } from './model/houses';
+import { DEFAULT_HOUSE, FAMILIES, HOUSES, houseById, placeHouse } from './model/houses';
 import { parsePlan } from './model/plan';
 import { createView3D, type View3D } from './ui/view3d';
 import { interior } from './ui/sketch';
@@ -28,6 +28,7 @@ let view3d: View3D | null = null;
 
 const STORE = 'treehouse-construtor-v1';
 const history = new History(5);
+let wallTargets: Door[] = []; // shared walls drawn on the current floor, for clicks
 
 function el(tag: string, attrs: Record<string, string | number> = {}, parent?: Element): SVGElement {
   const e = document.createElementNS(NS, tag);
@@ -39,7 +40,9 @@ const m1 = (dm: number) => (dm / 10).toFixed(1).replace('.', ',');
 
 // ---------- palette ----------
 const modsBox = $('mods');
-for (const [k, t] of Object.entries(TYPES) as [TypeId, (typeof TYPES)[TypeId]][]) {
+let paletteAll = false;
+function modButton(k: TypeId): HTMLButtonElement {
+  const t = TYPES[k];
   const b = document.createElement('button');
   b.className = 'mod'; b.type = 'button'; b.dataset.type = k;
   const s = document.createElementNS(NS, 'svg');
@@ -50,8 +53,33 @@ for (const [k, t] of Object.entries(TYPES) as [TypeId, (typeof TYPES)[TypeId]][]
   interior(g, k, t.w, t.h);
   b.appendChild(s);
   b.insertAdjacentHTML('beforeend', `<b>${t.name}</b><span>${m1(t.w)}×${m1(t.h)} m<br>${Math.round(t.w * t.h / 100)} m²</span>`);
-  modsBox.appendChild(b);
+  return b;
 }
+const ALL_TYPES = Object.keys(TYPES) as TypeId[];
+$('pAllN').textContent = `(${ALL_TYPES.length})`;
+/** "Desta casa": the pieces of the start house plus what is on the plan now, and stairs. "Todos": every type by category. */
+function renderPalette(): void {
+  $('pHouse').setAttribute('aria-selected', String(!paletteAll)); $('pAll').setAttribute('aria-selected', String(paletteAll));
+  modsBox.innerHTML = '';
+  if (!paletteAll) {
+    const used = new Set<TypeId>([...(houseById(houseId)?.plan.map(p => p.type) ?? []), ...mods.map(m => m.type), 'escada']);
+    const grid = document.createElement('div'); grid.className = 'mods';
+    for (const c of CATEGORIES) for (const k of ALL_TYPES) if (used.has(k) && TYPES[k].cat === c.id) grid.appendChild(modButton(k));
+    modsBox.appendChild(grid);
+    return;
+  }
+  for (const c of CATEGORIES) {
+    const ks = ALL_TYPES.filter(k => TYPES[k].cat === c.id);
+    if (!ks.length) continue;
+    const d = document.createElement('details'); d.className = 'cat'; d.open = c.id === 'sala';
+    d.innerHTML = `<summary>${c.name} <small>${ks.length}</small></summary>`;
+    const grid = document.createElement('div'); grid.className = 'mods';
+    ks.forEach(k => grid.appendChild(modButton(k)));
+    d.appendChild(grid); modsBox.appendChild(d);
+  }
+}
+$('pHouse').onclick = () => { paletteAll = false; renderPalette(); };
+$('pAll').onclick = () => { paletteAll = true; renderPalette(); };
 
 // ---------- geometry helpers ----------
 const toWorld = (cx: number, cy: number) => { const r = svg.getBoundingClientRect(); return { x: (cx - r.left - view.tx) / view.s, y: (cy - r.top - view.ty) / view.s }; };
@@ -74,7 +102,7 @@ function render(): void {
   }
   save();
   if (is3D && view3d) { view3d.build(mods, sel, bad, ds); placeSelbar(); return; }
-  render2D(bad, ds);
+  render2D(bad, connections(mods));
 }
 
 function render2D(bad: Set<Mod>, ds: Door[]): void {
@@ -101,13 +129,20 @@ function render2D(bad: Set<Mod>, ds: Door[]): void {
     interior(lg, m.type, t.w, t.h);
   }
   // doors on shared walls
-  for (const d of ds.filter(d => d.z === curLevel)) {
+  const here2 = ds.filter(d => d.z === curLevel);
+  for (const d of here2) {
+    if (d.wall) continue;
     const BG = { stroke: 'var(--paper-deep)', 'stroke-width': 6, 'vector-effect': 'non-scaling-stroke' };
     if (d.open || d.glass) {
-      const hl = d.open ? d.len / 2 - 1.5 : Math.min(9, d.len / 2 - 1.5);
+      const single = d.glass && !d.open && d.len < 22;
+      const hl = d.open ? d.len / 2 - 1.5 : single ? Math.min(4.5, d.len / 2 - 1) : Math.min(9, d.len / 2 - 1.5);
       if (d.vertical) el('line', { ...BG, x1: d.x, y1: d.y - hl, x2: d.x, y2: d.y + hl }, world);
       else el('line', { ...BG, x1: d.x - hl, y1: d.y, x2: d.x + hl, y2: d.y }, world);
-      if (d.glass) {
+      if (single) {
+        const G = { stroke: '#7fd3ff', 'stroke-width': 1.4, 'vector-effect': 'non-scaling-stroke' };
+        if (d.vertical) el('line', { ...G, x1: d.x, y1: d.y - hl, x2: d.x, y2: d.y + hl }, world);
+        else el('line', { ...G, x1: d.x - hl, y1: d.y, x2: d.x + hl, y2: d.y }, world);
+      } else if (d.glass) {
         const G = { stroke: '#7fd3ff', 'stroke-width': 1.4, 'vector-effect': 'non-scaling-stroke' };
         if (d.vertical) { el('line', { ...G, x1: d.x - 0.5, y1: d.y - hl, x2: d.x - 0.5, y2: d.y + 1 }, world); el('line', { ...G, x1: d.x + 0.5, y1: d.y - 1, x2: d.x + 0.5, y2: d.y + hl }, world); }
         else { el('line', { ...G, x1: d.x - hl, y1: d.y - 0.5, x2: d.x + 1, y2: d.y - 0.5 }, world); el('line', { ...G, x1: d.x - 1, y1: d.y + 0.5, x2: d.x + hl, y2: d.y + 0.5 }, world); }
@@ -125,6 +160,13 @@ function render2D(bad: Set<Mod>, ds: Door[]): void {
       el('path', { ...S, d: `M${d.x - half} ${d.y + 9} A9 9 0 0 0 ${d.x + half} ${d.y}`, 'stroke-dasharray': '1.5 1.5' }, world);
     }
   }
+  // click a shared wall to switch door ↔ plain wall
+  here2.forEach((d, i) => {
+    const hl = Math.max(2, d.len / 2 - 2), H = { class: 'dw', 'data-i': i, stroke: 'transparent', 'stroke-width': 14, 'vector-effect': 'non-scaling-stroke' };
+    const t = el('line', d.vertical ? { ...H, x1: d.x, y1: d.y - hl, x2: d.x, y2: d.y + hl } : { ...H, x1: d.x - hl, y1: d.y, x2: d.x + hl, y2: d.y }, world);
+    el('title', {}, t).textContent = d.wall ? 'Parede: clique para pôr uma porta' : 'Clique para fechar com parede';
+  });
+  wallTargets = here2;
   // labels (never rotated)
   for (const m of here) {
     const f = fp(m), fs = Math.max(2.2, 11 / view.s);
@@ -156,6 +198,8 @@ function placeSelbar(): void {
 
 // ---------- 2D interactions ----------
 svg.addEventListener('pointerdown', e => {
+  const dw = (e.target as Element).closest('.dw') as SVGElement | null;
+  if (dw) { const d = wallTargets[Number(dw.dataset.i)]; if (d) { toggleWall(d.a, d.b); render(); } return; }
   const g = (e.target as Element).closest('g.m') as SVGGElement | null;
   if (g) {
     const m = mods.find(x => x.id === Number(g.dataset.id))!;
@@ -179,7 +223,7 @@ svg.addEventListener('pointerup', endDrag);
 svg.addEventListener('pointercancel', endDrag);
 svg.addEventListener('wheel', e => { e.preventDefault(); const r = svg.getBoundingClientRect(); zoomAt(e.clientX - r.left, e.clientY - r.top, e.deltaY < 0 ? 1.12 : 1 / 1.12); }, { passive: false });
 function zoomAt(px: number, py: number, k: number): void {
-  const ns = Math.min(20, Math.max(2.5, view.s * k)); k = ns / view.s;
+  const ns = Math.min(20, Math.max(1.2, view.s * k)); k = ns / view.s;
   view.tx = px - (px - view.tx) * k; view.ty = py - (py - view.ty) * k; view.s = ns; render();
 }
 $('zin').onclick = () => { if (is3D) return view3d?.dolly(0.8); const r = svg.getBoundingClientRect(); zoomAt(r.width / 2, r.height / 2, 1.25); };
@@ -267,7 +311,37 @@ document.addEventListener('keydown', e => {
 });
 
 // ---------- start house, clear, fit ----------
-function loadRiga(): void { curLevel = 0; mods = rigaT2(() => nextId++); sel = null; fit(); }
+// ---------- start house ----------
+const HOUSE_KEY = 'treehouse-casa';
+let houseId = DEFAULT_HOUSE;
+try { const h = localStorage.getItem(HOUSE_KEY); if (houseById(h)) houseId = h!; } catch { /* storage blocked */ }
+const housesBox = $('houses');
+for (const fam of FAMILIES) {
+  const hs = HOUSES.filter(h => h.family === fam);
+  if (!hs.length) continue;
+  housesBox.insertAdjacentHTML('beforeend', `<small>${fam}</small>`);
+  const row = document.createElement('div');
+  for (const h of hs) {
+    const b = document.createElement('button');
+    b.type = 'button'; b.dataset.house = h.id; b.textContent = h.label;
+    b.title = `${h.name} · ${h.catalogArea} · catálogo p. ${h.page}`;
+    b.onclick = () => loadHouse(h.id);
+    row.appendChild(b);
+  }
+  housesBox.appendChild(row);
+}
+function showHouse(): void {
+  const h = houseById(houseId)!;
+  for (const b of housesBox.querySelectorAll<HTMLButtonElement>('button')) b.setAttribute('aria-pressed', String(b.dataset.house === houseId));
+  $('houseNote').textContent = `${h.name} (${h.catalogArea}, catálogo p. ${h.page}), partida nas suas peças.`;
+}
+function loadHouse(id: string): void {
+  const h = houseById(id); if (!h) return;
+  houseId = id;
+  try { localStorage.setItem(HOUSE_KEY, id); } catch { /* storage blocked */ }
+  curLevel = 0; mods = placeHouse(h, () => nextId++); sel = null; showHouse(); renderPalette(); fit();
+}
+const loadRiga = () => loadHouse(houseId);
 function fit(): void {
   if (is3D) { view3d?.frame(mods); render(); return; }
   if (!mods.length) { render(); return; }
@@ -275,7 +349,7 @@ function fit(): void {
   const x0 = Math.min(...fs.map(f => f.x)), y0 = Math.min(...fs.map(f => f.y)), x1 = Math.max(...fs.map(f => f.x + f.w)), y1 = Math.max(...fs.map(f => f.y + f.h));
   const narrow = r.width < 640, padL = narrow ? 20 : 290, padR = narrow ? 20 : 300, padT = narrow ? 150 : 40, padB = narrow ? 190 : 40;
   const s = Math.min((r.width - padL - padR) / (x1 - x0), (r.height - padT - padB) / (y1 - y0));
-  view.s = Math.min(12, Math.max(2.5, s));
+  view.s = Math.min(8, Math.max(1.2, s * 0.56)); // leave plenty of room around the house
   view.tx = padL + ((r.width - padL - padR) - (x1 - x0) * view.s) / 2 - x0 * view.s;
   view.ty = padT + ((r.height - padT - padB) - (y1 - y0) * view.s) / 2 - y0 * view.s;
   render();
@@ -332,6 +406,7 @@ for (const b of document.querySelectorAll<HTMLButtonElement>('#finish button[dat
 setupQuote({
   getMods: () => mods,
   finish: () => finish,
+  house: () => houseId,
   capture: () => ensure3D()?.capture(mods, problems(mods).bad, doors(mods)) ?? null,
 });
 
@@ -352,7 +427,9 @@ $('undo').onclick = undo;
 
 let loaded: Mod[] | null = null;
 try { loaded = parsePlan(JSON.parse(localStorage.getItem(STORE) || 'null')); } catch { /* ignore */ }
+showHouse();
 requestAnimationFrame(() => {
+  renderPalette();
   if (loaded && loaded.length) { mods = loaded; nextId = Math.max(...mods.map(m => m.id)) + 1; fit(); }
   else loadRiga();
 });

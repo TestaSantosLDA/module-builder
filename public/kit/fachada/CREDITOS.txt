@@ -1,0 +1,5 @@
+Texturas de fachada: Poly Haven (https://polyhaven.com), licença CC0.
+madeira_* = Japanese Cedar Planks (japanese_cedar_planks)
+branco_*  = White Planks Clean (white_planks_clean)
+grafite_* = Black Painted Planks (black_painted_planks)
+*_cor = cor (sRGB), *_nor = normal OpenGL, *_arm = AO (R), rugosidade (G), metal (B)

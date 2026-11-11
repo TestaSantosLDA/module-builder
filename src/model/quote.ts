@@ -3,6 +3,7 @@
 import type { Mod } from './catalog.js';
 import { summarize } from './geometry.js';
 import { parsePlan } from './plan.js';
+import { DEFAULT_HOUSE, houseById } from './houses.js';
 
 export const FINISH_NAMES = { branco: 'Branco', madeira: 'Madeira', grafite: 'Grafite' } as const;
 export type FinishId = keyof typeof FINISH_NAMES;
@@ -14,6 +15,8 @@ export interface QuoteRequest {
   tel?: string;
   rgpd: true;
   fachada: FinishId;
+  /** catalogue house the plan started from */
+  casa: string;
   plan: Mod[];
   /** JPEG data URL of the 3D view, optional */
   image?: string;
@@ -54,7 +57,8 @@ export function parseQuote(body: unknown): Parsed<QuoteRequest | QuoteDetails> {
   const fachada = (Object.keys(FINISH_NAMES) as FinishId[]).find(f => f === b.fachada) ?? 'branco';
   let image: string | undefined;
   if (typeof b.image === 'string' && b.image.startsWith('data:image/jpeg;base64,') && b.image.length <= MAX_IMAGE_CHARS) image = b.image;
-  return { ok: true, value: { kind: 'pedido', nome, email, tel: str(b.tel, 40), rgpd: true, fachada, plan, image, website: str(b.website, 200) } };
+  const casa = houseById(str(b.casa, 40))?.id ?? DEFAULT_HOUSE;
+  return { ok: true, value: { kind: 'pedido', nome, email, tel: str(b.tel, 40), rgpd: true, fachada, casa, plan, image, website: str(b.website, 200) } };
 }
 
 /** Request reference, e.g. TH-261111-K3QZ. */
@@ -79,7 +83,7 @@ export function salesEmail(q: QuoteRequest, ref: string): Email {
   const html = `<div style="font:14px/1.5 Arial,Helvetica,sans-serif;color:#1d2733;max-width:640px">
 <p>Um cliente montou uma casa no construtor e pediu orçamento. Responder em até 2 dias úteis.</p>
 ${h5('Cliente')}${table(row('Nome', q.nome) + row('Email', q.email) + row('Telefone', q.tel || 'não indicado'))}
-${h5('Casa')}${table(row('Ponto de partida', 'Treehouse Riga T2 (modificada)') + s.rows.map(r => row('Piso ' + r.level, r.items.join(', '))).join('') + row('Área interior', s.area + ' m²') + row('Deck', s.deck + ' m²') + row('Portas criadas', String(s.doors)) + row('Fachada', FINISH_NAMES[q.fachada]))}
+${h5('Casa')}${table(row('Ponto de partida', houseById(q.casa)?.name ?? '-') + s.rows.map(r => row('Piso ' + r.level, r.items.join(', '))).join('') + row('Área interior', s.area + ' m²') + row('Deck', s.deck + ' m²') + row('Portas criadas', String(s.doors)) + row('Fachada', FINISH_NAMES[q.fachada]))}
 ${s.msgs.length ? `<p style="background:#fff4ef;border-left:3px solid #d9573f;padding:8px 10px;font-size:13px;margin-top:10px"><b>A planta tem avisos:</b> ${esc(s.msgs.join(' '))}</p>` : ''}
 <p style="font-size:13px;color:#5d6b7a">Em anexo: ${q.image ? 'vista 3D da casa e ' : ''}a planta (planta.json) para reabrir no construtor.</p>
 ${h5('Próximos passos sugeridos')}<ol style="margin:0;padding-left:18px"><li>Ligar ao cliente e confirmar terreno, acessos de camião e grua, e acabamentos.</li><li>Validar a planta com a equipa técnica (módulos, cargas, escadas).</li><li>Enviar o orçamento com mapa de medições.</li></ol>

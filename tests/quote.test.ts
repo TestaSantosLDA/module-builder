@@ -4,7 +4,7 @@ import { newRef, parseQuote, salesEmail, type QuoteRequest } from '../src/model/
 
 let n = 1;
 const plan = rigaT2(() => n++);
-const base = { kind: 'pedido', nome: 'Ana Silva', email: 'ana@example.com', rgpd: true, fachada: 'madeira', plan };
+const base = { kind: 'pedido', nome: 'Ana Silva', email: 'ana@example.com', rgpd: true, fachada: 'madeira', casa: 'riga-t2', plan };
 
 describe('parseQuote', () => {
   it('accepts name + email + consent', () => {
@@ -38,7 +38,8 @@ describe('salesEmail', () => {
     expect(m.html).toContain('&lt;b&gt;Ana&lt;/b&gt;');
     expect(m.html).not.toContain('<b>Ana</b>');
     expect(m.html).toContain('Madeira');
-    expect(m.text).toContain('Piso 0: 2 × Deck');
+    expect(m.html).toContain('Treehouse Riga T2');
+    expect(m.text).toContain('Piso 0: 2 × Pátio com pérgola (Riga)');
   });
 });
 
