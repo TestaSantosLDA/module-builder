@@ -34,9 +34,9 @@ describe('automatic doors', () => {
   it('ignores modules on different floors', () => {
     expect(doors([M('quarto', 0, 0), M('quarto', 28, 0, 1)])).toHaveLength(0);
   });
-  it('the Riga T2 gets 12 doors', () => {
+  it('the Riga T2 gets 10 openings, as in the catalogue', () => {
     let n = 1;
-    expect(doors(rigaT2(() => n++))).toHaveLength(12);
+    expect(doors(rigaT2(() => n++))).toHaveLength(10);
   });
 });
 
@@ -85,7 +85,7 @@ describe('summary', () => {
   it('counts the Riga T2', () => {
     let n = 1;
     const s = summarize(rigaT2(() => n++));
-    expect(s).toMatchObject({ floors: 1, rooms: 6, area: 69, deck: 33, doors: 12, msgs: [] });
+    expect(s).toMatchObject({ floors: 1, rooms: 6, area: 69, deck: 33, doors: 10, msgs: [] });
   });
 });
 
@@ -105,3 +105,23 @@ describe('door ↔ wall flip', () => {
     expect(parsePlan([{ id: 1, type: 'quarto', x: 0, y: 0, rot: 0, z: 0, flip: [2] }])?.[0].flip).toEqual([2]);
   });
 });
+
+describe('door rules', () => {
+  it('bedrooms side by side get a wall, a bathroom never opens onto the living room', () => {
+    expect(doors([M('quarto', 0, 0), M('quarto', 28, 0), M('entrada', 0, 35)]).map(d => TYPESNAME(d))).not.toContain('quarto|quarto');
+  });
+  it('a room the rules would close off keeps one door', () => {
+    expect(doors([M('quarto', 0, 0), M('quarto', 28, 0)])).toHaveLength(1);
+  });
+  it('kitchen + kitchen and sala + sala are open plan', () => {
+    expect(doors([M('cozinha', 0, 0), M('cozinha', 28, 0)])[0].open).toBe(true);
+  });
+  it('warns about a room nobody can get into', () => {
+    const a = M('quarto', 0, 0), b = M('entrada', 28, 0), c = M('deck', 0, 35);
+    toggleWallT(a, b);
+    expect(problems([a, b]).msgs.join(' ')).toMatch(/Sem acesso: Quarto/);
+    expect(problems([a, b, c]).msgs).toEqual([]); // the deck's glass door lets you in
+  });
+});
+const TYPESNAME = (d: { a: Mod; b: Mod }) => `${d.a.type}|${d.b.type}`;
+import { toggleWall as toggleWallT } from '../src/model/geometry';

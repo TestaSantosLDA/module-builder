@@ -49,10 +49,21 @@ export type TypeId = keyof typeof TYPES;
 export const isTypeId = (t: unknown): t is TypeId => typeof t === 'string' && Object.prototype.hasOwnProperty.call(TYPES, t);
 
 /** A kitchen next to a living room joins as open plan: no wall, no door. */
+/** Kitchens, living rooms and the halls that lead into them form one open space (no wall), as in the catalogue houses. */
 export const isOpenPlan = (a: TypeId, b: TypeId): boolean => {
-  const sa = TYPES[a].sketch, sb = TYPES[b].sketch;
-  return (sa === 'cozinha' && sb === 'sala') || (sa === 'sala' && sb === 'cozinha');
+  const ra = roleOf(a), rb = roleOf(b);
+  return (ra === 'living' && rb === 'living') || (ra === 'living' && rb === 'hall') || (ra === 'hall' && rb === 'living');
 };
+
+/** What a room is used for, as far as the door rules are concerned. */
+export type Role = 'deck' | 'stairs' | 'hall' | 'wc' | 'living' | 'bed';
+export function roleOf(t: TypeId): Role {
+  const T = TYPES[t];
+  if (T.kind === 'deck') return 'deck';
+  if (T.stairs) return 'stairs';
+  if (T.cat === 'circ' || /entrada|hall|antec|circula/i.test(T.name)) return 'hall';
+  return T.cat === 'wc' ? 'wc' : T.cat === 'sala' ? 'living' : 'bed';
+}
 
 /** Storey height in dm. */
 export const STOREY = 30;

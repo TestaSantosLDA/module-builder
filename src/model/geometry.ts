@@ -1,4 +1,4 @@
-import { isOpenPlan, MAX_LEVEL, MIN_DOOR_WALL, TYPES, type Mod } from './catalog.js';
+import { isOpenPlan, MAX_LEVEL, MIN_DOOR_WALL, roleOf, TYPES, type Mod, type Role } from './catalog.js';
 
 export interface Rect { x: number; y: number; w: number; h: number }
 
@@ -72,10 +72,22 @@ export function doors(mods: readonly Mod[]): Door[] {
 /** Has the user flipped the wall between a and b? (stored on either module) */
 export const flipped = (a: Mod, b: Mod) => !!(a.flip?.includes(b.id) || b.flip?.includes(a.id));
 
-/** Default before any flip: should this shared wall be a plain wall? */
-export function ruleWall(_a: Mod, _b: Mod): boolean {
+/**
+ * Default before any flip: should this shared wall be a plain wall?
+ * Bedrooms don't open into each other, bathrooms don't open onto the living room, the kitchen or another bathroom,
+ * and bathrooms and stairs don't open onto a deck. Halls and stairs open to everything else.
+ */
+export function ruleWall(a: Mod, b: Mod): boolean {
+  const ra = roleOf(a.type), rb = roleOf(b.type), has = (r: Role) => ra === r || rb === r;
+  if (ra === 'bed' && rb === 'bed') return true;
+  if (ra === 'wc' && rb === 'wc') return true;
+  if (has('wc') && has('living')) return true;
+  if (has('deck') && (has('wc') || has('stairs'))) return true;
   return false;
 }
+
+/** Fewer is better: which neighbour a room with no way in should open to first. */
+const ACCESS_PREF: Record<Role, number> = { hall: 0, living: 1, stairs: 2, deck: 3, bed: 4, wc: 5 };
 
 /** Flip the shared wall between a and b (door ↔ wall). */
 export function toggleWall(a: Mod, b: Mod): void {
@@ -94,7 +106,7 @@ export function connections(mods: readonly Mod[]): Door[] {
     if (di && dj) continue;
     const a = footprint(mi), b = footprint(mj);
     const open = isOpenPlan(mi.type, mj.type), glass = di || dj;
-    const base = { open, glass, z: level(mi), a: mi, b: mj, wall: ruleWall(mi, mj) !== flipped(mi, mj) };
+    const base = { open, glass, z: level(mi), a: mi, b: mj, wall: ruleWall(mi, mj) };
     if (a.x + a.w === b.x || b.x + b.w === a.x) {
       const ov = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y);
       if (ov >= MIN_DOOR_WALL) out.push({ ...base, x: a.x + a.w === b.x ? b.x : a.x, y: Math.max(a.y, b.y) + ov / 2, vertical: true, len: ov });
@@ -103,7 +115,41 @@ export function connections(mods: readonly Mod[]): Door[] {
       if (ov >= MIN_DOOR_WALL) out.push({ ...base, x: Math.max(a.x, b.x) + ov / 2, y: a.y + a.h === b.y ? b.y : a.y, vertical: false, len: ov });
     }
   }
+  // a room the rules would close off completely keeps one door, to its best neighbour
+  for (const m of mods) {
+    if (kindOf(m) !== 'room') continue;
+    const mine = out.filter(d => d.a === m || d.b === m);
+    if (!mine.length || mine.some(d => !d.wall)) continue;
+    const other = (d: Door) => (d.a === m ? d.b : d.a);
+    mine.sort((x, y) => ACCESS_PREF[roleOf(other(x).type)] - ACCESS_PREF[roleOf(other(y).type)])[0].wall = false;
+  }
+  for (const d of out) if (flipped(d.a, d.b)) d.wall = !d.wall;
   return out;
+}
+
+/** Rooms that can't be reached: no opening at all, or a group of rooms with no way in from a deck, a hall or the stairs. */
+export function unreachable(mods: readonly Mod[]): Mod[] {
+  const rooms = mods.filter(m => kindOf(m) === 'room');
+  if (rooms.length < 2) return [];
+  const open = doors(mods), adj = new Map<Mod, Mod[]>(rooms.map(r => [r, []]));
+  const entry = new Set<Mod>(rooms.filter(r => ['hall', 'stairs'].includes(roleOf(r.type))));
+  // upstairs, the stairs arrive in the rooms above them (or anywhere on that floor if none is above them)
+  for (let l = 1; l <= MAX_LEVEL; l++) {
+    const up = rooms.filter(r => level(r) === l), st = rooms.filter(r => level(r) === l - 1 && TYPES[r.type].stairs);
+    const above = up.filter(r => st.some(s => overlaps(footprint(r), footprint(s))));
+    for (const r of above.length ? above : up) entry.add(r);
+  }
+  for (const d of open) {
+    const da = kindOf(d.a) === 'deck', db = kindOf(d.b) === 'deck';
+    if (da && !db) entry.add(d.b); else if (db && !da) entry.add(d.a);
+    else if (!da && !db) { adj.get(d.a)!.push(d.b); adj.get(d.b)!.push(d.a); }
+  }
+  // no hall and no deck on the ground floor: the front door is in the living room
+  if (![...entry].some(r => !level(r))) for (const r of rooms) if (!level(r) && roleOf(r.type) === 'living') entry.add(r);
+  if (!entry.size) return [];
+  const seen = new Set<Mod>(entry), q = [...entry];
+  while (q.length) for (const n of adj.get(q.pop()!) ?? []) if (!seen.has(n)) { seen.add(n); q.push(n); }
+  return rooms.filter(r => !seen.has(r));
 }
 
 export interface Problems { bad: Set<Mod>; msgs: string[] }
@@ -130,6 +176,8 @@ export function problems(mods: readonly Mod[]): Problems {
   for (let l = 1; l <= MAX_LEVEL; l++)
     if (mods.some(m => level(m) === l) && !mods.some(m => level(m) === l - 1 && TYPES[m.type].stairs))
       msgs.push(`Falta uma escada no piso ${l - 1} para subir ao piso ${l}.`);
+  const shut = unreachable(mods);
+  if (shut.length) msgs.push(`Sem acesso: ${[...new Set(shut.map(m => TYPES[m.type].name))].join(', ')}. Carregue numa parede para abrir uma porta.`);
   return { bad, msgs };
 }
 
