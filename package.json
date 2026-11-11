@@ -1,0 +1,23 @@
+{
+  "name": "treehouse-construtor",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "three": "0.147.0"
+  },
+  "devDependencies": {
+    "@types/three": "0.147.1",
+    "@vercel/node": "^3.2.29",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.11",
+    "vitest": "^2.1.8"
+  }
+}
