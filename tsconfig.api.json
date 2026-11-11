@@ -1,0 +1,13 @@
+{
+  "//": "The serverless function runs as plain Node ESM: relative imports need .js extensions. This config checks that.",
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "types": ["node"]
+  },
+  "include": ["api"]
+}

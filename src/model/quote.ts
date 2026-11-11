@@ -1,8 +1,8 @@
 // Quote request: the payload the site sends and the email the Jular sales team receives.
 // Shared by the browser (src/ui/quote.ts) and the serverless function (api/quote.ts).
-import type { Mod } from './catalog';
-import { summarize } from './geometry';
-import { parsePlan } from './plan';
+import type { Mod } from './catalog.js';
+import { summarize } from './geometry.js';
+import { parsePlan } from './plan.js';
 
 export const FINISH_NAMES = { branco: 'Branco', madeira: 'Madeira', grafite: 'Grafite' } as const;
 export type FinishId = keyof typeof FINISH_NAMES;

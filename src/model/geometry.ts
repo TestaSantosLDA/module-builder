@@ -1,4 +1,4 @@
-import { MAX_LEVEL, MIN_DOOR_WALL, OPEN_PLAN, TYPES, type Mod } from './catalog';
+import { MAX_LEVEL, MIN_DOOR_WALL, OPEN_PLAN, TYPES, type Mod } from './catalog.js';
 
 export interface Rect { x: number; y: number; w: number; h: number }
 
