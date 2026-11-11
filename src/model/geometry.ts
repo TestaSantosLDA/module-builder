@@ -1,4 +1,5 @@
 import { isOpenPlan, MAX_LEVEL, MIN_DOOR_WALL, roleOf, TYPES, type Mod, type Role } from './catalog.js';
+import { defaultOutside, fits, OPENINGS, type Dir, type Opening } from './openings.js';
 
 export interface Rect { x: number; y: number; w: number; h: number }
 
@@ -59,6 +60,10 @@ export interface Door {
   b: Mod;
   /** plain wall instead of an opening (the rule's choice, flipped by the user) */
   wall: boolean;
+  /** what is in the wall: from the rules, or chosen by the user */
+  kind: Opening;
+  /** the user chose `kind` in the wall menu */
+  chosen: boolean;
 }
 
 /**
@@ -66,8 +71,26 @@ export interface Door {
  * room–room gets a door, room–deck a glass sliding door, sala–cozinha is open plan, deck–deck nothing.
  */
 export function doors(mods: readonly Mod[]): Door[] {
-  return connections(mods).filter(d => !d.wall);
+  return connections(mods).filter(d => OPENINGS[d.kind].pass);
 }
+
+/** The user's choice for the shared wall between a and b, if any. */
+export const joinChoice = (a: Mod, b: Mod): Opening | undefined => a.join?.[b.id] ?? b.join?.[a.id];
+
+/** Choose what goes in the shared wall between a and b; undefined goes back to the rules (and the house's own doors). */
+export function setJoin(a: Mod, b: Mod, k: Opening | undefined): void {
+  for (const [m, o] of [[a, b], [b, a]] as const) if (m.join) { delete m.join[o.id]; if (!Object.keys(m.join).length) delete m.join; }
+  if (k) (a.join ??= {})[b.id] = k;
+}
+
+/** Choose what goes in an outside wall of m; undefined goes back to the default. */
+export function setOut(m: Mod, side: Dir, k: Opening | undefined): void {
+  if (k) (m.out ??= {})[side] = k;
+  else if (m.out) { delete m.out[side]; if (!Object.keys(m.out).length) delete m.out; }
+}
+
+/** Opening the rules give a shared wall that is not a plain wall. */
+const ruleOpening = (open: boolean, glass: boolean, len: number): Opening => (open ? 'aberto' : glass ? (len >= 22 ? 'correr' : 'vidro') : 'porta');
 
 /** Has the user flipped the wall between a and b? (stored on either module) */
 export const flipped = (a: Mod, b: Mod) => !!(a.flip?.includes(b.id) || b.flip?.includes(a.id));
@@ -106,7 +129,7 @@ export function connections(mods: readonly Mod[]): Door[] {
     if (di && dj) continue;
     const a = footprint(mi), b = footprint(mj);
     const open = isOpenPlan(mi.type, mj.type), glass = di || dj;
-    const base = { open, glass, z: level(mi), a: mi, b: mj, wall: ruleWall(mi, mj) };
+    const base = { open, glass, z: level(mi), a: mi, b: mj, wall: ruleWall(mi, mj), kind: 'parede' as Opening, chosen: false };
     if (a.x + a.w === b.x || b.x + b.w === a.x) {
       const ov = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y);
       if (ov >= MIN_DOOR_WALL) out.push({ ...base, x: a.x + a.w === b.x ? b.x : a.x, y: Math.max(a.y, b.y) + ov / 2, vertical: true, len: ov });
@@ -123,7 +146,13 @@ export function connections(mods: readonly Mod[]): Door[] {
     const other = (d: Door) => (d.a === m ? d.b : d.a);
     mine.sort((x, y) => ACCESS_PREF[roleOf(other(x).type)] - ACCESS_PREF[roleOf(other(y).type)])[0].wall = false;
   }
-  for (const d of out) if (flipped(d.a, d.b)) d.wall = !d.wall;
+  for (const d of out) {
+    if (flipped(d.a, d.b)) d.wall = !d.wall;
+    d.kind = d.wall ? 'parede' : ruleOpening(d.open, d.glass, d.len);
+    const c = joinChoice(d.a, d.b);
+    if (c) { d.kind = c; d.chosen = true; }
+    d.wall = d.kind === 'parede'; d.open = d.kind === 'aberto'; d.glass = d.kind === 'vidro' || d.kind === 'correr';
+  }
   return out;
 }
 
@@ -144,6 +173,8 @@ export function unreachable(mods: readonly Mod[]): Mod[] {
     if (da && !db) entry.add(d.b); else if (db && !da) entry.add(d.a);
     else if (!da && !db) { adj.get(d.a)!.push(d.b); adj.get(d.b)!.push(d.a); }
   }
+  // a front door or glass door in an outside wall of the ground floor
+  for (const r of rooms) if (!level(r) && outWalls(mods, r).some(w => OPENINGS[w.kind].pass)) entry.add(r);
   // no hall and no deck on the ground floor: the front door is in the living room
   if (![...entry].some(r => !level(r))) for (const r of rooms) if (!level(r) && roleOf(r.type) === 'living') entry.add(r);
   if (!entry.size) return [];
@@ -177,7 +208,7 @@ export function problems(mods: readonly Mod[]): Problems {
     if (mods.some(m => level(m) === l) && !mods.some(m => level(m) === l - 1 && TYPES[m.type].stairs))
       msgs.push(`Falta uma escada no piso ${l - 1} para subir ao piso ${l}.`);
   const shut = unreachable(mods);
-  if (shut.length) msgs.push(`Sem acesso: ${[...new Set(shut.map(m => TYPES[m.type].name))].join(', ')}. Carregue numa parede para abrir uma porta.`);
+  if (shut.length) msgs.push(`Sem acesso: ${[...new Set(shut.map(m => TYPES[m.type].name))].join(', ')}. Clique numa parede para lhe pôr uma porta.`);
   return { bad, msgs };
 }
 
@@ -201,6 +232,51 @@ export function sides(mods: readonly Mod[], m: Mod): Record<'N' | 'S' | 'W' | 'E
   return out;
 }
 
+export interface OutWall {
+  m: Mod;
+  side: Dir;
+  /** centre of the wall, dm */
+  x: number;
+  y: number;
+  vertical: boolean;
+  /** wall length, dm */
+  len: number;
+  /** free length between the corner posts, m */
+  clear: number;
+  kind: Opening;
+  chosen: boolean;
+}
+
+/** Outside walls of a room (nothing touching them on its level), with their window, glass door or front door. */
+export function outWalls(mods: readonly Mod[], m: Mod): OutWall[] {
+  if (kindOf(m) !== 'room') return [];
+  const f = footprint(m), sd = sides(mods, m);
+  const all: OutWall[] = [];
+  for (const side of ['N', 'S', 'W', 'E'] as Dir[]) {
+    if (sd[side] !== 'free') continue;
+    const vertical = side === 'W' || side === 'E', len = vertical ? f.h : f.w;
+    all.push({
+      m, side, vertical, len, clear: vertical ? len / 10 - 0.4 : len / 10, kind: 'parede', chosen: false,
+      x: side === 'W' ? f.x : side === 'E' ? f.x + f.w : f.x + f.w / 2,
+      y: side === 'N' ? f.y : side === 'S' ? f.y + f.h : f.y + f.h / 2,
+    });
+  }
+  // defaults go on the longest walls first
+  const spec = defaultOutside(m);
+  [...all].sort((a, b) => b.len - a.len).forEach((w, i) => { const k = spec[i]; if (k && fits(k, w.clear)) w.kind = k; });
+  for (const w of all) { const c = m.out?.[w.side]; if (c) { w.kind = c; w.chosen = true; } }
+  return all;
+}
+
+/** Count of each kind of window and door in the house, for the quote (e.g. "3 × Janela 1,2 m"). */
+export function openingCounts(mods: readonly Mod[]): string[] {
+  const n = new Map<Opening, number>();
+  const add = (k: Opening) => { if (k !== 'parede' && k !== 'aberto') n.set(k, (n.get(k) || 0) + 1); };
+  for (const d of connections(mods)) add(d.kind);
+  for (const m of mods) for (const w of outWalls(mods, m)) add(w.kind);
+  return [...n].map(([k, v]) => `${v} × ${OPENINGS[k].name}`);
+}
+
 export interface Summary {
   floors: number;
   rows: { level: number; items: string[] }[];
@@ -208,6 +284,8 @@ export interface Summary {
   area: number;
   deck: number;
   doors: number;
+  /** windows and doors by kind */
+  openings: string[];
   msgs: string[];
 }
 
@@ -223,5 +301,5 @@ export function summarize(mods: readonly Mod[]): Summary {
     rows.push({ level: l, items: [...count].map(([k, v]) => `${v} × ${k}`) });
   }
   const rooms = mods.filter(m => kindOf(m) === 'room');
-  return { floors, rows, rooms: rooms.length, area: areaOf(rooms), deck: areaOf(mods.filter(m => kindOf(m) === 'deck')), doors: doors(mods).length, msgs: problems(mods).msgs };
+  return { floors, rows, rooms: rooms.length, area: areaOf(rooms), deck: areaOf(mods.filter(m => kindOf(m) === 'deck')), doors: doors(mods).length, openings: openingCounts(mods), msgs: problems(mods).msgs };
 }
