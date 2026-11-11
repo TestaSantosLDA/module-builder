@@ -3,7 +3,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { detailsEmail, newRef, parseQuote, salesEmail } from '../src/model/quote.js';
 
-const DEFAULT_FROM = 'Construtor Treehouse <onboarding@resend.dev>';
+const DEFAULT_FROM = 'TreeHouse Studio <onboarding@resend.dev>';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Use POST.' });

@@ -130,6 +130,16 @@ kbd{font:500 10.5px var(--f-mono);border:1px solid var(--grid-major);border-bott
   .brand small,.proto{display:none}
 }
 @media (prefers-reduced-motion:no-preference){ .mod{transition:border-color .15s} }
+/* parts menu: collapsible on phones and tablets */
+.ptoggle{display:none;width:100%;align-items:center;justify-content:space-between;font:600 12px var(--f-ui);letter-spacing:.1em;text-transform:uppercase;color:var(--ink);background:var(--paper);border:1px solid var(--grid-major);border-radius:3px;padding:7px 10px;cursor:pointer}
+.ptoggle span{transition:transform .15s}
+.palette.collapsed .ptoggle span{transform:rotate(-90deg)}
+@media (max-width:1024px),(pointer:coarse){
+  .ptoggle{display:flex}
+  .pbody{margin-top:8px}
+  .palette.collapsed{width:auto;right:auto;padding:6px}
+  .palette.collapsed .pbody{display:none}
+}
 /* shared walls: click to switch door ↔ wall */
 .dw { cursor: pointer; }
 .dw:hover { stroke: rgba(227, 178, 119, .45); }
