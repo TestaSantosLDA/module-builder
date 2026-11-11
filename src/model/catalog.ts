@@ -2,6 +2,7 @@
 // Sizes are PROVISIONAL: estimated from the Riga T2 plan (catalogue p. 37) until Jular sends real dimensions.
 
 import { EXTRA_TYPES } from './catalog-houses.js';
+import type { Dir, Opening } from './openings.js';
 
 export type Kind = 'room' | 'deck';
 /** Palette group. */
@@ -82,4 +83,8 @@ export interface Mod {
   z: number;
   /** neighbours (by id) whose shared wall the user flipped: door ↔ plain wall */
   flip?: number[];
+  /** what the user chose for the shared wall with a neighbour (by id); wins over the rules and flips */
+  join?: Record<number, Opening>;
+  /** what the user chose for each outside wall (world directions, N = smaller y) */
+  out?: Partial<Record<Dir, Opening>>;
 }

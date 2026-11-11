@@ -5,7 +5,8 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { MAX_LEVEL, STOREY, TYPES, type Mod } from '../model/catalog';
-import { footprint as fp, level as lv, overlaps, sides, type Door } from '../model/geometry';
+import { footprint as fp, level as lv, outWalls, overlaps, sides, type Door } from '../model/geometry';
+import { OPENINGS, pieceOf, widthOf } from '../model/openings';
 
 export type Finish = 'branco' | 'madeira' | 'grafite';
 
@@ -46,17 +47,6 @@ const ROOFT = 0.3; // roof slab
 /** Facade finishes: real wood scans (Poly Haven, CC0) in public/kit/fachada; size = metres covered by one texture tile. */
 const FACADE: Record<Finish, { size: number; normal: number }> = { branco: { size: 1.8, normal: 0.8 }, madeira: { size: 1.13, normal: 1 }, grafite: { size: 1.6, normal: 1 } };
 
-/** Kit pieces placed on free outside walls, per room type: [piece, sill height m]. Longest wall first. */
-const UNIT: Partial<Record<Mod['type'], [string, number][]>> = {
-  sala: [['W_sala', 0.2], ['W_sala2', 0.7]], cozinha: [['W_cozinha', 1.05]], entrada: [['D_entrada', 0], ['W_wc', 1.6]],
-  quarto: [['W_quarto', 0.9]], suite: [['W_quarto', 0.9], ['W_wc', 1.6]], livre: [['W_livre', 0.8]], escada: [['W_escada', 0.4]],
-};
-/** Opening size of each kit piece, [width, height] m. */
-const UW: Record<string, [number, number]> = {
-  W_sala: [2.4, 2.2], W_sala2: [1.6, 1.6], W_quarto: [1.2, 1.2], W_cozinha: [1.4, 1.0], W_wc: [0.6, 0.6], W_escada: [0.5, 2.0],
-  W_livre: [1.4, 1.4], D_entrada: [1.0, 2.2], G_240: [2.4, 2.3], G_180: [1.8, 2.3], G_090: [0.9, 2.3],
-};
-
 const noRay = <O extends THREE.Object3D>(o: O): O => { o.traverse(n => { n.raycast = () => {}; }); return o; };
 const withUV2 = <G extends THREE.BufferGeometry>(g: G): G => { g.setAttribute('uv2', g.attributes.uv); return g; };
 function boxAt(w: number, h: number, d: number, mat: THREE.Material, x: number, y: number, z: number, parent: THREE.Object3D): THREE.Mesh {
@@ -65,8 +55,6 @@ function boxAt(w: number, h: number, d: number, mat: THREE.Material, x: number, 
 function placeAt<O extends THREE.Object3D>(obj: O, cx: number, y: number, cz: number, nx: number, nz: number, off: number): O {
   const r = Math.atan2(nx, nz); obj.rotation.y = r; obj.position.set(cx + Math.cos(r) * off, y, cz - Math.sin(r) * off); return obj;
 }
-/** Glass door for a room–deck wall of this length (dm): wide, standard, or a single leaf on short walls. */
-export const glassDoor = (len: number) => (len >= 29 ? 'G_240' : len >= 22 ? 'G_180' : 'G_090');
 /** Single-leaf glass door, 0.9 m, built in the same frame position and materials as the 1.8 m kit door. */
 function singleGlassDoor(ref: THREE.Object3D): THREE.Object3D {
   const c = ref.clone(true); c.position.set(0, 0, 0); c.rotation.set(0, 0, 0); c.updateMatrixWorld(true);
@@ -186,31 +174,27 @@ export function createView3D(box: HTMLElement, host: View3DHost): View3D | null 
   }
 
   function roomModule(mods: Mod[], m: Mod, ds: Door[]): THREE.Group {
-    const f = fp(m), w = f.w / 10, d = f.h / 10, y0 = BASE + lv(m) * WH, cx = f.x / 10 + w / 2, cz = f.y / 10 + d / 2, sd = sides(mods, m);
+    const f = fp(m), w = f.w / 10, d = f.h / 10, y0 = BASE + lv(m) * WH, cx = f.x / 10 + w / 2, cz = f.y / 10 + d / 2;
     type Wall = { c: [number, number]; n: [number, number]; L: number; H: Hole[] };
     const S: Record<'N' | 'S' | 'W' | 'E', Wall> = {
       N: { c: [cx, f.y / 10], n: [0, -1], L: w, H: [] }, S: { c: [cx, f.y / 10 + d], n: [0, 1], L: w, H: [] },
       W: { c: [f.x / 10, cz], n: [-1, 0], L: d - 2 * T, H: [] }, E: { c: [f.x / 10 + w, cz], n: [1, 0], L: d - 2 * T, H: [] },
     };
     const local = (k: keyof typeof S, X: number, Z: number) => { const s = S[k], r = Math.atan2(s.n[0], s.n[1]); return (X - s.c[0]) * Math.cos(r) - (Z - s.c[1]) * Math.sin(r); };
-    // openings from the automatic door rules
+    // shared walls: doors, open plan, glass doors and windows towards a deck
     for (const dd of ds) {
-      if (dd.a !== m && dd.b !== m) continue;
+      if ((dd.a !== m && dd.b !== m) || dd.kind === 'parede') continue;
       const k: keyof typeof S = dd.vertical ? (Math.abs(dd.x - f.x) < 0.5 ? 'W' : 'E') : (Math.abs(dd.y - f.y) < 0.5 ? 'N' : 'S');
-      const off = local(k, dd.x / 10, dd.y / 10);
-      if (dd.glass) { const u = glassDoor(dd.len); S[k].H.push({ u, x: off, y: 0, w: UW[u][0], h: UW[u][1] }); }
-      else if (dd.open) S[k].H.push({ x: off, y: 0, w: dd.len / 10 - 0.3, h: WH - FL - ROOFT - 0.05 });
-      else S[k].H.push({ x: off, y: 0, w: 0.9, h: 2.1 });
+      const off = local(k, dd.x / 10, dd.y / 10), o = OPENINGS[dd.kind];
+      if (dd.kind === 'aberto') S[k].H.push({ x: off, y: 0, w: dd.len / 10 - 0.3, h: WH - FL - ROOFT - 0.05 });
+      else S[k].H.push({ u: pieceOf(dd.kind, dd.len), x: off, y: o.sill, w: widthOf(dd.kind, dd.len), h: o.h });
     }
-    // windows and the front door on free outside walls, longest wall first
-    const free = (Object.keys(S) as (keyof typeof S)[]).filter(k => sd[k] === 'free').sort((a, b) => S[b].L - S[a].L);
-    const spec = (UNIT[m.type] || UNIT.livre!).slice();
-    if (m.type === 'entrada' && lv(m)) spec.shift(); // no front door upstairs
-    free.forEach((k, i) => {
-      const sp = spec[i]; if (!sp) return;
-      const [u, sill] = sp, [uw, uh] = UW[u];
-      if (uw <= S[k].L - 0.4) S[k].H.push({ u, x: 0, y: sill, w: uw, h: uh });
-    });
+    // outside walls: windows, glass doors and the front door, as chosen or by default
+    for (const ow of outWalls(mods, m)) {
+      if (ow.kind === 'parede') continue;
+      const o = OPENINGS[ow.kind];
+      S[ow.side].H.push({ u: pieceOf(ow.kind, ow.len), x: 0, y: o.sill, w: widthOf(ow.kind, ow.len), h: o.h });
+    }
     const g = new THREE.Group();
     for (const s of Object.values(S)) {
       g.add(placeAt(wall(s.L, s.H.map(h => ({ x: h.x, y: FL + h.y, w: h.w, h: h.h }))), s.c[0], y0, s.c[1], s.n[0], s.n[1], 0));

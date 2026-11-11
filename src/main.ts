@@ -2,7 +2,8 @@
 // Pure rules live in src/model (tested); this file is the browser UI.
 import './style.css';
 import { CATEGORIES, MAX_LEVEL, TYPES, type Mod, type TypeId } from './model/catalog';
-import { connections, doors, toggleWall, footprint as fp, level as lv, problems, snapToNeighbours, summarize, type Door } from './model/geometry';
+import { connections, footprint as fp, level as lv, outWalls, problems, setJoin, setOut, snapToNeighbours, summarize, type Door, type OutWall } from './model/geometry';
+import { CHOICES, fits, OPENINGS, TURN, widthOf, type Opening } from './model/openings';
 import { History } from './model/history';
 import { DEFAULT_HOUSE, FAMILIES, HOUSES, houseById, placeHouse } from './model/houses';
 import { parsePlan } from './model/plan';
@@ -28,7 +29,8 @@ let view3d: View3D | null = null;
 
 const STORE = 'treehouse-construtor-v1';
 const history = new History(5);
-let wallTargets: Door[] = []; // shared walls drawn on the current floor, for clicks
+type WallTarget = { shared?: Door; out?: OutWall };
+let wallTargets: WallTarget[] = []; // walls drawn on the current floor, for clicks
 
 function el(tag: string, attrs: Record<string, string | number> = {}, parent?: Element): SVGElement {
   const e = document.createElementNS(NS, tag);
@@ -88,11 +90,11 @@ const snap = Math.round;
 
 // ---------- render ----------
 function render(): void {
-  const { bad, msgs } = problems(mods), ds = doors(mods), s = summarize(mods);
+  const { bad, msgs } = problems(mods), cs = connections(mods), s = summarize(mods);
   $('sMods').textContent = String(s.rooms);
   $('sArea').textContent = String(s.area);
   $('sDeck').textContent = String(s.deck);
-  $('sDoors').textContent = String(ds.length);
+  $('sDoors').textContent = String(s.doors);
   $('sFloors').textContent = String(s.floors);
   const w = $('warn'); w.hidden = !msgs.length; w.textContent = msgs.join(' ');
   for (const b of document.querySelectorAll<HTMLButtonElement>('#floors button')) {
@@ -101,8 +103,8 @@ function render(): void {
     b.style.fontWeight = mods.some(m => lv(m) === l) ? '700' : '400';
   }
   save();
-  if (is3D && view3d) { view3d.build(mods, sel, bad, ds); placeSelbar(); return; }
-  render2D(bad, connections(mods));
+  if (is3D && view3d) { view3d.build(mods, sel, bad, cs); placeSelbar(); return; }
+  render2D(bad, cs);
 }
 
 function render2D(bad: Set<Mod>, ds: Door[]): void {
@@ -128,45 +130,18 @@ function render2D(bad: Set<Mod>, ds: Door[]): void {
     el('rect', { x: 0, y: 0, width: t.w, height: t.h, fill: deck ? 'rgba(227,178,119,.06)' : 'var(--paper-deep)', stroke: bad.has(m) ? 'var(--bad)' : (m === sel ? 'var(--wood)' : 'var(--ink)'), 'stroke-width': deck ? 1.2 : 3, 'stroke-dasharray': deck ? '6 4' : 'none', 'vector-effect': 'non-scaling-stroke' }, lg);
     interior(lg, m.type, t.w, t.h);
   }
-  // doors on shared walls
+  // what is in each wall: shared walls, then the outside walls of the rooms
   const here2 = ds.filter(d => d.z === curLevel);
-  for (const d of here2) {
-    if (d.wall) continue;
-    const BG = { stroke: 'var(--paper-deep)', 'stroke-width': 6, 'vector-effect': 'non-scaling-stroke' };
-    if (d.open || d.glass) {
-      const single = d.glass && !d.open && d.len < 22;
-      const hl = d.open ? d.len / 2 - 1.5 : single ? Math.min(4.5, d.len / 2 - 1) : Math.min(9, d.len / 2 - 1.5);
-      if (d.vertical) el('line', { ...BG, x1: d.x, y1: d.y - hl, x2: d.x, y2: d.y + hl }, world);
-      else el('line', { ...BG, x1: d.x - hl, y1: d.y, x2: d.x + hl, y2: d.y }, world);
-      if (single) {
-        const G = { stroke: '#7fd3ff', 'stroke-width': 1.4, 'vector-effect': 'non-scaling-stroke' };
-        if (d.vertical) el('line', { ...G, x1: d.x, y1: d.y - hl, x2: d.x, y2: d.y + hl }, world);
-        else el('line', { ...G, x1: d.x - hl, y1: d.y, x2: d.x + hl, y2: d.y }, world);
-      } else if (d.glass) {
-        const G = { stroke: '#7fd3ff', 'stroke-width': 1.4, 'vector-effect': 'non-scaling-stroke' };
-        if (d.vertical) { el('line', { ...G, x1: d.x - 0.5, y1: d.y - hl, x2: d.x - 0.5, y2: d.y + 1 }, world); el('line', { ...G, x1: d.x + 0.5, y1: d.y - 1, x2: d.x + 0.5, y2: d.y + hl }, world); }
-        else { el('line', { ...G, x1: d.x - hl, y1: d.y - 0.5, x2: d.x + 1, y2: d.y - 0.5 }, world); el('line', { ...G, x1: d.x - 1, y1: d.y + 0.5, x2: d.x + hl, y2: d.y + 0.5 }, world); }
-      }
-      continue;
-    }
-    const half = 4.5, S = { stroke: 'var(--wood)', 'stroke-width': 1.2, fill: 'none', 'vector-effect': 'non-scaling-stroke' };
-    if (d.vertical) {
-      el('line', { ...BG, x1: d.x, y1: d.y - half, x2: d.x, y2: d.y + half }, world);
-      el('line', { ...S, x1: d.x, y1: d.y - half, x2: d.x + 9, y2: d.y - half }, world);
-      el('path', { ...S, d: `M${d.x + 9} ${d.y - half} A9 9 0 0 1 ${d.x} ${d.y + half}`, 'stroke-dasharray': '1.5 1.5' }, world);
-    } else {
-      el('line', { ...BG, x1: d.x - half, y1: d.y, x2: d.x + half, y2: d.y }, world);
-      el('line', { ...S, x1: d.x - half, y1: d.y, x2: d.x - half, y2: d.y + 9 }, world);
-      el('path', { ...S, d: `M${d.x - half} ${d.y + 9} A9 9 0 0 0 ${d.x + half} ${d.y}`, 'stroke-dasharray': '1.5 1.5' }, world);
-    }
-  }
-  // click a shared wall to switch door ↔ plain wall
-  here2.forEach((d, i) => {
-    const hl = Math.max(2, d.len / 2 - 2), H = { class: 'dw', 'data-i': i, stroke: 'transparent', 'stroke-width': 14, 'vector-effect': 'non-scaling-stroke' };
-    const t = el('line', d.vertical ? { ...H, x1: d.x, y1: d.y - hl, x2: d.x, y2: d.y + hl } : { ...H, x1: d.x - hl, y1: d.y, x2: d.x + hl, y2: d.y }, world);
-    el('title', {}, t).textContent = d.wall ? 'Parede: clique para pôr uma porta' : 'Clique para fechar com parede';
+  const outs = here.flatMap(m => outWalls(mods, m));
+  for (const d of here2) drawOpening(world, d.x, d.y, d.vertical, d.len, d.kind, 1);
+  for (const o of outs) drawOpening(world, o.x, o.y, o.vertical, o.len, o.kind, o.side === 'N' || o.side === 'W' ? 1 : -1);
+  // click any wall to choose what goes in it
+  wallTargets = [...here2.map(d => ({ shared: d })), ...outs.map(o => ({ out: o }))];
+  wallTargets.forEach((t, i) => {
+    const w = t.shared ?? t.out!, hl = Math.max(2, w.len / 2 - 2), H = { class: 'dw', 'data-i': i, stroke: 'transparent', 'stroke-width': t.shared ? 14 : 10, 'vector-effect': 'non-scaling-stroke' };
+    const ln = el('line', w.vertical ? { ...H, x1: w.x, y1: w.y - hl, x2: w.x, y2: w.y + hl } : { ...H, x1: w.x - hl, y1: w.y, x2: w.x + hl, y2: w.y }, world);
+    el('title', {}, ln).textContent = `${OPENINGS[w.kind].name}: clique para mudar`;
   });
-  wallTargets = here2;
   // labels (never rotated)
   for (const m of here) {
     const f = fp(m), fs = Math.max(2.2, 11 / view.s);
@@ -186,6 +161,78 @@ function render2D(bad: Set<Mod>, ds: Door[]): void {
   placeSelbar();
 }
 
+/** Plan symbol for what is in a wall. `inward` (+1/-1) is the side, along x or y, a door swings into. */
+function drawOpening(world: Element, x: number, y: number, vertical: boolean, len: number, kind: Opening, inward: 1 | -1): void {
+  if (kind === 'parede') return;
+  const BG = { stroke: 'var(--paper-deep)', 'stroke-width': 6, 'vector-effect': 'non-scaling-stroke' };
+  const G = { stroke: '#7fd3ff', 'stroke-width': 1.4, 'vector-effect': 'non-scaling-stroke' };
+  const seg = (A: Record<string, string | number>, h: number, off = 0, from = -h, to = h) =>
+    el('line', vertical ? { ...A, x1: x + off, y1: y + from, x2: x + off, y2: y + to } : { ...A, x1: x + from, y1: y + off, x2: x + to, y2: y + off }, world);
+  if (kind === 'aberto') { seg(BG, len / 2 - 1.5); return; }
+  if (kind === 'porta' || kind === 'entrada') {
+    const half = kind === 'entrada' ? 5 : 4.5, r = 2 * half, s = inward;
+    const S = { stroke: kind === 'entrada' ? 'var(--ink)' : 'var(--wood)', 'stroke-width': kind === 'entrada' ? 1.6 : 1.2, fill: 'none', 'vector-effect': 'non-scaling-stroke' };
+    seg(BG, half);
+    if (vertical) {
+      el('line', { ...S, x1: x, y1: y - half, x2: x + r * s, y2: y - half }, world);
+      el('path', { ...S, d: `M${x + r * s} ${y - half} A${r} ${r} 0 0 ${s > 0 ? 1 : 0} ${x} ${y + half}`, 'stroke-dasharray': '1.5 1.5' }, world);
+    } else {
+      el('line', { ...S, x1: x - half, y1: y, x2: x - half, y2: y + r * s }, world);
+      el('path', { ...S, d: `M${x - half} ${y + r * s} A${r} ${r} 0 0 ${s > 0 ? 0 : 1} ${x + half} ${y}`, 'stroke-dasharray': '1.5 1.5' }, world);
+    }
+    return;
+  }
+  const hl = widthOf(kind, len) * 5;
+  seg(BG, hl);
+  if (kind === 'correr') { seg(G, hl, -0.5, -hl, 1); seg(G, hl, 0.5, -1, hl); return; }
+  seg(G, hl);
+  // windows: glass line with end ticks
+  if (kind !== 'vidro') for (const e of [-hl, hl]) el('line', vertical ? { ...G, 'stroke-width': 1, x1: x - 1.2, y1: y + e, x2: x + 1.2, y2: y + e } : { ...G, 'stroke-width': 1, x1: x + e, y1: y - 1.2, x2: x + e, y2: y + 1.2 }, world);
+}
+
+// ---------- wall menu ----------
+const wallMenu = document.createElement('div');
+wallMenu.id = 'wallmenu'; wallMenu.className = 'wallmenu'; wallMenu.hidden = true; wallMenu.setAttribute('role', 'menu');
+main.appendChild(wallMenu);
+const closeWallMenu = () => { wallMenu.hidden = true; };
+function openWallMenu(t: WallTarget, cx: number, cy: number): void {
+  const w = t.shared ?? t.out!, len = w.len;
+  let title: string, list: Opening[], clear: number, auto: Opening, apply: (k: Opening | undefined) => void;
+  if (t.shared) {
+    const d = t.shared, deck = TYPES[d.a.type].kind === 'deck' || TYPES[d.b.type].kind === 'deck';
+    title = `Entre ${TYPES[d.a.type].name} e ${TYPES[d.b.type].name}`;
+    list = deck ? CHOICES.deck : CHOICES.room; clear = len / 10;
+    const saved = [d.a.join, d.b.join];
+    setJoin(d.a, d.b, undefined);
+    auto = connections(mods).find(c => c.a === d.a && c.b === d.b)?.kind ?? 'parede';
+    [d.a.join, d.b.join] = saved; if (!d.a.join) delete d.a.join; if (!d.b.join) delete d.b.join;
+    apply = k => setJoin(d.a, d.b, k);
+  } else {
+    const o = t.out!, m = o.m;
+    title = `${TYPES[m.type].name}, parede exterior`;
+    list = lv(m) ? CHOICES.outsideUp : CHOICES.outside; clear = o.clear;
+    const saved = m.out?.[o.side];
+    setOut(m, o.side, undefined);
+    auto = outWalls(mods, m).find(x => x.side === o.side)?.kind ?? 'parede';
+    if (saved) setOut(m, o.side, saved);
+    apply = k => setOut(m, o.side, k);
+  }
+  const chosen = t.shared ? t.shared.chosen : t.out!.chosen;
+  const btn = (label: string, on: boolean, ok: boolean, k: Opening | undefined) =>
+    `<button type="button" role="menuitemradio" aria-checked="${on}" ${ok ? '' : 'disabled title="Não cabe nesta parede"'} data-k="${k ?? ''}">${label}${ok ? '' : ' <small>não cabe</small>'}</button>`;
+  wallMenu.innerHTML = `<b>${title}</b><small>${m1(len)} m de parede</small>` +
+    btn(`Automático <small>(${OPENINGS[auto].name.toLowerCase()})</small>`, !chosen, true, undefined) +
+    list.map(k => btn(OPENINGS[k].name, chosen && w.kind === k, fits(k, clear), k)).join('');
+  wallMenu.querySelectorAll<HTMLButtonElement>('button').forEach(b => {
+    b.onclick = () => { apply((b.dataset.k || undefined) as Opening | undefined); closeWallMenu(); render(); };
+  });
+  wallMenu.hidden = false;
+  const mr = main.getBoundingClientRect(), r = wallMenu.getBoundingClientRect();
+  wallMenu.style.left = Math.min(Math.max(8, cx - mr.left + 12), mr.width - r.width - 8) + 'px';
+  wallMenu.style.top = Math.min(Math.max(8, cy - mr.top - 20), mr.height - r.height - 8) + 'px';
+  (wallMenu.querySelector('button[aria-checked="true"]') as HTMLButtonElement | null)?.focus();
+}
+
 function placeSelbar(): void {
   const bar = $('selbar');
   if (!sel || drag || view3d?.dragging() || (!is3D && lv(sel) !== curLevel)) { bar.hidden = true; return; }
@@ -199,7 +246,8 @@ function placeSelbar(): void {
 // ---------- 2D interactions ----------
 svg.addEventListener('pointerdown', e => {
   const dw = (e.target as Element).closest('.dw') as SVGElement | null;
-  if (dw) { const d = wallTargets[Number(dw.dataset.i)]; if (d) { toggleWall(d.a, d.b); render(); } return; }
+  closeWallMenu();
+  if (dw) { const t = wallTargets[Number(dw.dataset.i)]; if (t) openWallMenu(t, e.clientX, e.clientY); return; }
   const g = (e.target as Element).closest('g.m') as SVGGElement | null;
   if (g) {
     const m = mods.find(x => x.id === Number(g.dataset.id))!;
@@ -223,6 +271,7 @@ svg.addEventListener('pointerup', endDrag);
 svg.addEventListener('pointercancel', endDrag);
 svg.addEventListener('wheel', e => { e.preventDefault(); const r = svg.getBoundingClientRect(); zoomAt(e.clientX - r.left, e.clientY - r.top, e.deltaY < 0 ? 1.12 : 1 / 1.12); }, { passive: false });
 function zoomAt(px: number, py: number, k: number): void {
+  closeWallMenu();
   const ns = Math.min(20, Math.max(1.2, view.s * k)); k = ns / view.s;
   view.tx = px - (px - view.tx) * k; view.ty = py - (py - view.ty) * k; view.s = ns; render();
 }
@@ -280,6 +329,7 @@ function rotate(): void {
   if (!sel) return;
   const before = fp(sel);
   sel.rot = ((sel.rot + 90) % 360) as Mod['rot'];
+  if (sel.out) { const o: Mod['out'] = {}; for (const [k, v] of Object.entries(sel.out)) o[TURN[k as keyof typeof TURN]] = v; sel.out = o; }
   const after = fp(sel);
   sel.x = snap(before.x + before.w / 2 - after.w / 2); sel.y = snap(before.y + before.h / 2 - after.h / 2);
   render();
@@ -293,7 +343,7 @@ function moveLevel(d: number): void {
   render();
 }
 function del(): void { if (!sel) return; const gone = sel; mods = mods.filter(x => x !== gone); sel = null; render(); }
-function dup(): void { if (!sel) return; const f = fp(sel); const m = { ...sel, id: nextId++, x: f.x + f.w }; mods.push(m); sel = m; render(); }
+function dup(): void { if (!sel) return; const f = fp(sel); const m: Mod = { ...sel, id: nextId++, x: f.x + f.w }; delete m.join; delete m.flip; if (sel.out) m.out = { ...sel.out }; mods.push(m); sel = m; render(); }
 $('bUp').onclick = () => moveLevel(1);
 $('bDown').onclick = () => moveLevel(-1);
 $('bRot').onclick = rotate; $('bDel').onclick = del; $('bDup').onclick = dup;
@@ -302,12 +352,13 @@ for (const b of document.querySelectorAll<HTMLButtonElement>('#floors button'))
 
 document.addEventListener('keydown', e => {
   if (!$('modal').hidden || (e.target as Element).closest('input,textarea,select')) return;
+  if (!wallMenu.hidden && e.key !== 'Escape') return;
   if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z') && !e.shiftKey) { e.preventDefault(); undo(); return; }
   if (e.key === 'r' || e.key === 'R') rotate();
   else if (e.key === 'PageUp') moveLevel(1);
   else if (e.key === 'PageDown') moveLevel(-1);
   else if (e.key === 'Delete' || e.key === 'Backspace') del();
-  else if (e.key === 'Escape') { sel = null; render(); }
+  else if (e.key === 'Escape') { if (!wallMenu.hidden) { closeWallMenu(); return; } sel = null; render(); }
 });
 
 // ---------- start house, clear, fit ----------
@@ -375,7 +426,7 @@ function ensure3D(): View3D | null {
 }
 function setView(three: boolean): void {
   if (three && !ensure3D()) return;
-  is3D = three;
+  is3D = three; closeWallMenu();
   $('tab2d').setAttribute('aria-pressed', String(!three)); $('tab3d').setAttribute('aria-pressed', String(three));
   (svg as unknown as HTMLElement).hidden = three; $('view3d').hidden = !three;
   $('floors').hidden = three; $('tip3d').hidden = !three; $('finish').hidden = !three;
@@ -407,7 +458,7 @@ setupQuote({
   getMods: () => mods,
   finish: () => finish,
   house: () => houseId,
-  capture: () => ensure3D()?.capture(mods, problems(mods).bad, doors(mods)) ?? null,
+  capture: () => ensure3D()?.capture(mods, problems(mods).bad, connections(mods)) ?? null,
 });
 
 // ---------- undo + persistence ----------
