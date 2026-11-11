@@ -43,7 +43,8 @@ const BASE = 0.3; // modules sit on footings 30 cm above the ground
 const T = 0.2; // wall thickness
 const FL = 0.25; // floor build-up
 const ROOFT = 0.3; // roof slab
-const TINT: Record<Finish, number> = { branco: 0xffffff, madeira: 0xc08a55, grafite: 0x4d535a };
+/** Facade finishes: real wood scans (Poly Haven, CC0) in public/kit/fachada; size = metres covered by one texture tile. */
+const FACADE: Record<Finish, { size: number; normal: number }> = { branco: { size: 1.8, normal: 0.8 }, madeira: { size: 1.13, normal: 1 }, grafite: { size: 1.6, normal: 1 } };
 
 /** Kit pieces placed on free outside walls, per room type: [piece, sill height m]. Longest wall first. */
 const UNIT: Partial<Record<Mod['type'], [string, number][]>> = {
@@ -112,7 +113,7 @@ export function createView3D(box: HTMLElement, host: View3DHost): View3D | null 
     floor: new THREE.MeshStandardMaterial({ color: 0x9a6b43, roughness: 0.55 }),
     ceil: new THREE.MeshStandardMaterial({ color: 0xf4f1ec, roughness: 0.95, side: THREE.DoubleSide }),
     deckSide: new THREE.MeshStandardMaterial({ color: 0x6e4a2c, roughness: 0.9 }),
-    clad: new THREE.MeshStandardMaterial({ roughness: 0.78 }),
+    clad: new THREE.MeshStandardMaterial({ roughness: 1, metalness: 0 }),
     deck: new THREE.MeshStandardMaterial({ color: 0xb98a62, roughness: 0.82 }),
   };
   // ---------- Blender kit ----------
@@ -123,7 +124,12 @@ export function createView3D(box: HTMLElement, host: View3DHost): View3D | null 
     t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(rx, ry); if (srgb) t.encoding = THREE.sRGBEncoding; t.anisotropy = 8; return t;
   };
   // wall UVs are in metres: one cladding tile = 1.2 m × 2.4 m; deck UVs are scaled to 1.12 m tiles
-  Object.assign(M.clad, { map: tex('revestimento_cor.jpg', true, 1 / 1.2, 1 / 2.4), normalMap: tex('revestimento_normal.png', false, 1 / 1.2, 1 / 2.4), aoMap: tex('revestimento_ao.jpg', false, 1 / 1.2, 1 / 2.4) });
+  const facades: Partial<Record<Finish, Partial<THREE.MeshStandardMaterial>>> = {};
+  const facade = (f: Finish) => {
+    const { size, normal } = FACADE[f], r = 1 / size, arm = tex(`fachada/${f}_arm.jpg`, false, r, r);
+    return (facades[f] ??= { map: tex(`fachada/${f}_cor.jpg`, true, r, r), normalMap: tex(`fachada/${f}_nor.jpg`, false, r, r), normalScale: new THREE.Vector2(normal, normal), aoMap: arm, roughnessMap: arm });
+  };
+  Object.assign(M.clad, facade('branco'));
   Object.assign(M.deck, { map: tex('deck_cor.jpg', true, 1, 1), normalMap: tex('deck_normal.png', false, 1, 1), aoMap: tex('deck_ao.jpg', false, 1, 1) });
   new GLTFLoader().load(host.kitUrl + 'kit.glb', g => {
     for (const o of g.scene.children) { units[o.name] = o; o.traverse(n => { if ((n as THREE.Mesh).isMesh) n.castShadow = true; n.raycast = () => {}; }); }
@@ -178,6 +184,8 @@ export function createView3D(box: HTMLElement, host: View3DHost): View3D | null 
       g.add(placeAt(wall(s.L, s.H.map(h => ({ x: h.x, y: FL + h.y, w: h.w, h: h.h }))), s.c[0], y0, s.c[1], s.n[0], s.n[1], 0));
       for (const h of s.H) if (h.u && units[h.u]) g.add(placeAt(units[h.u].clone(true), s.c[0], y0 + FL + h.y, s.c[1], s.n[0], s.n[1], h.x));
     }
+    // anthracite corner trims hide the wall ends, as on the real modules
+    for (const [sx, sz] of [[0, 0], [1, 0], [0, 1], [1, 1]]) boxAt(T + 0.03, WH, T + 0.03, M.cap, f.x / 10 + sx * w + (sx ? -T / 2 + 0.015 : T / 2 - 0.015), y0 + WH / 2, f.y / 10 + sz * d + (sz ? -T / 2 + 0.015 : T / 2 - 0.015), g);
     const fl = new THREE.Mesh(new THREE.PlaneGeometry(w - 2 * T, d - 2 * T), M.floor); fl.rotation.x = -Math.PI / 2; fl.position.set(cx, y0 + FL, cz); fl.receiveShadow = true; g.add(fl);
     const ce = new THREE.Mesh(new THREE.PlaneGeometry(w - 2 * T, d - 2 * T), M.ceil); ce.rotation.x = Math.PI / 2; ce.position.set(cx, y0 + WH - ROOFT, cz); g.add(ce);
     const rf = boxAt(w - 2 * T, ROOFT - 0.02, d - 2 * T, M.roof, cx, y0 + WH - ROOFT / 2 - 0.01, cz, g); rf.castShadow = true;
@@ -297,7 +305,7 @@ export function createView3D(box: HTMLElement, host: View3DHost): View3D | null 
     resize,
     start() { cancelAnimationFrame(loop); tick(); },
     stop() { cancelAnimationFrame(loop); },
-    setFinish(f) { M.clad.color.set(TINT[f]); },
+    setFinish(f) { Object.assign(M.clad, facade(f)); M.clad.needsUpdate = true; host.changed(); },
     capture(mods, bad, ds) {
       const p = cam.position.clone(), t = controls.target.clone();
       renderer.setSize(960, 600, false); cam.aspect = 960 / 600; cam.updateProjectionMatrix(); frame(mods); dolly(0.62);
