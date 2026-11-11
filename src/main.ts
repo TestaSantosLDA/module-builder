@@ -457,7 +457,16 @@ function ensure3D(): View3D | null {
       changed: render,
       selectionMoved: placeSelbar,
       snap: m => snapToNeighbours(mods, m),
+      wallClick: (m, side, x, y, cx, cy) => {
+        const ow = outWalls(mods, m).find(w => w.side === side);
+        if (ow) { openWallMenu({ out: ow }, cx, cy); return; }
+        const f = fp(m), sideOf = (d: Door) => (d.vertical ? (Math.abs(d.x - f.x) < 0.5 ? 'W' : 'E') : (Math.abs(d.y - f.y) < 0.5 ? 'N' : 'S'));
+        const near = connections(mods).filter(d => (d.a === m || d.b === m) && sideOf(d) === side)
+          .map(d => ({ d, gap: Math.max(0, Math.abs(d.vertical ? y - d.y : x - d.x) - d.len / 2) })).sort((a, b) => a.gap - b.gap)[0];
+        if (near && near.gap < 2) openWallMenu({ shared: near.d }, cx, cy);
+      },
     });
+    $('view3d').addEventListener('pointerdown', closeWallMenu, true);
     if (!view3d) { const t = $<HTMLButtonElement>('tab3d'); t.disabled = true; t.title = 'Não foi possível abrir o 3D neste navegador'; return null; }
     view3d.setFinish(finish);
   }
