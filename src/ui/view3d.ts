@@ -82,6 +82,16 @@ function singleGlassDoor(ref: THREE.Object3D): THREE.Object3D {
   g.traverse(n => { if ((n as THREE.Mesh).isMesh) n.castShadow = true; });
   return g;
 }
+/** Box whose UVs are in metres (so tiled textures keep their real size) with uv2 for the AO map. */
+function meterBox(w: number, h: number, d: number): THREE.BoxGeometry {
+  const g = new THREE.BoxGeometry(w, h, d), uv = g.attributes.uv, n = g.attributes.normal;
+  for (let i = 0; i < uv.count; i++) {
+    const ax = Math.abs(n.getX(i)), ay = Math.abs(n.getY(i));
+    const [su, sv] = ax > 0.5 ? [d, h] : ay > 0.5 ? [w, d] : [w, h];
+    uv.setXY(i, uv.getX(i) * su, uv.getY(i) * sv);
+  }
+  return withUV2(g);
+}
 function shadowTexture(): THREE.Texture {
   const c = document.createElement('canvas'); c.width = c.height = 128; const x = c.getContext('2d')!;
   const g = x.createRadialGradient(64, 64, 23, 64, 64, 64); g.addColorStop(0, 'rgba(0,0,0,.55)'); g.addColorStop(1, 'rgba(0,0,0,0)');
@@ -132,6 +142,7 @@ export function createView3D(box: HTMLElement, host: View3DHost): View3D | null 
     deckSide: new THREE.MeshStandardMaterial({ color: 0x6e4a2c, roughness: 0.9 }),
     clad: new THREE.MeshStandardMaterial({ roughness: 1, metalness: 0 }),
     deck: new THREE.MeshStandardMaterial({ color: 0xb98a62, roughness: 0.82 }),
+    timber: new THREE.MeshStandardMaterial({ color: 0x7a5236, roughness: 0.8 }),
   };
   // ---------- Blender kit ----------
   const units: Record<string, THREE.Object3D> = {};
@@ -147,6 +158,9 @@ export function createView3D(box: HTMLElement, host: View3DHost): View3D | null 
     return (facades[f] ??= { map: tex(`fachada/${f}_cor.jpg`, true, r, r), normalMap: tex(`fachada/${f}_nor.jpg`, false, r, r), normalScale: new THREE.Vector2(normal, normal), aoMap: arm, roughnessMap: arm });
   };
   Object.assign(M.clad, facade('branco'));
+  const cladBox = (w: number, h: number, d: number, x: number, y: number, z: number, parent: THREE.Object3D) => {
+    const m = new THREE.Mesh(meterBox(w, h, d), M.clad); m.position.set(x, y, z); m.castShadow = m.receiveShadow = true; parent.add(m); return m;
+  };
   Object.assign(M.deck, { map: tex('deck_cor.jpg', true, 1, 1), normalMap: tex('deck_normal.png', false, 1, 1), aoMap: tex('deck_ao.jpg', false, 1, 1) });
   new GLTFLoader().load(host.kitUrl + 'kit.glb', g => {
     for (const o of g.scene.children) { units[o.name] = o; o.traverse(n => { if ((n as THREE.Mesh).isMesh) n.castShadow = true; n.raycast = () => {}; }); }
@@ -202,12 +216,33 @@ export function createView3D(box: HTMLElement, host: View3DHost): View3D | null 
       g.add(placeAt(wall(s.L, s.H.map(h => ({ x: h.x, y: FL + h.y, w: h.w, h: h.h }))), s.c[0], y0, s.c[1], s.n[0], s.n[1], 0));
       for (const h of s.H) if (h.u && units[h.u]) g.add(placeAt(units[h.u].clone(true), s.c[0], y0 + FL + h.y, s.c[1], s.n[0], s.n[1], h.x));
     }
-    // anthracite corner trims hide the wall ends, as on the real modules
-    for (const [sx, sz] of [[0, 0], [1, 0], [0, 1], [1, 1]]) boxAt(T + 0.03, WH, T + 0.03, M.cap, f.x / 10 + sx * w + (sx ? -T / 2 + 0.015 : T / 2 - 0.015), y0 + WH / 2, f.y / 10 + sz * d + (sz ? -T / 2 + 0.015 : T / 2 - 0.015), g);
+    // corner posts clad in the facade wood hide the wall ends (the catalogue houses have no coloured corner trims)
+    for (const [sx, sz] of [[0, 0], [1, 0], [0, 1], [1, 1]]) cladBox(T + 0.03, WH, T + 0.03, f.x / 10 + sx * w + (sx ? -T / 2 + 0.015 : T / 2 - 0.015), y0 + WH / 2, f.y / 10 + sz * d + (sz ? -T / 2 + 0.015 : T / 2 - 0.015), g);
     const fl = new THREE.Mesh(new THREE.PlaneGeometry(w - 2 * T, d - 2 * T), M.floor); fl.rotation.x = -Math.PI / 2; fl.position.set(cx, y0 + FL, cz); fl.receiveShadow = true; g.add(fl);
     const ce = new THREE.Mesh(new THREE.PlaneGeometry(w - 2 * T, d - 2 * T), M.ceil); ce.rotation.x = Math.PI / 2; ce.position.set(cx, y0 + WH - ROOFT, cz); g.add(ce);
     const rf = boxAt(w - 2 * T, ROOFT - 0.02, d - 2 * T, M.roof, cx, y0 + WH - ROOFT / 2 - 0.01, cz, g); rf.castShadow = true;
     return noRay(g);
+  }
+
+  /** Timber pergola over a deck: posts on the corners away from the house, edge beams and slats at roof height. */
+  function pergola(mods: Mod[], m: Mod, g: THREE.Group): void {
+    const f = fp(m), w = f.w / 10, d = f.h / 10, y0 = BASE + lv(m) * WH, x0 = f.x / 10, z0 = f.y / 10, sd = sides(mods, m);
+    const top = y0 + WH - 0.12, P = 0.12, B = 0.08;
+    const open = { N: sd.N !== 'room', S: sd.S !== 'room', W: sd.W !== 'room', E: sd.E !== 'room' };
+    for (const [cx, cz, a, b] of [[x0, z0, 'N', 'W'], [x0 + w, z0, 'N', 'E'], [x0, z0 + d, 'S', 'W'], [x0 + w, z0 + d, 'S', 'E']] as const)
+      if (open[a] || open[b]) boxAt(P, WH - 0.12, P, M.timber, cx + (cx === x0 ? P / 2 : -P / 2), y0 + (WH - 0.12) / 2, cz + (cz === z0 ? P / 2 : -P / 2), g).castShadow = true;
+    const along = w >= d; // slats run across the shorter side
+    const L = along ? w : d, S = along ? d : w;
+    for (const e of [0, 1]) { // two edge beams along the long side
+      const bm = along ? boxAt(w, 0.2, B, M.timber, x0 + w / 2, top, z0 + (e ? d - B / 2 : B / 2), g) : boxAt(B, 0.2, d, M.timber, x0 + (e ? w - B / 2 : B / 2), top, z0 + d / 2, g);
+      bm.castShadow = true;
+    }
+    const n = Math.max(2, Math.round(L / 0.45));
+    for (let i = 0; i <= n; i++) {
+      const t = 0.04 + (L - 0.08) * i / n;
+      const sl = along ? boxAt(0.05, 0.16, S, M.timber, x0 + t, top + 0.12, z0 + d / 2, g) : boxAt(S, 0.16, 0.05, M.timber, x0 + w / 2, top + 0.12, z0 + t, g);
+      sl.castShadow = true;
+    }
   }
 
   function deckModule(mods: Mod[], m: Mod): THREE.Group {
@@ -224,6 +259,7 @@ export function createView3D(box: HTMLElement, host: View3DHost): View3D | null 
         boxAt(lw, 0.9, ld, M.glass, x, y0 + 0.45, z, g); boxAt(lw + 0.02, 0.05, ld + 0.04, M.frame, x, y0 + 0.93, z, g);
       }
     }
+    if (TYPES[m.type]?.pergola) pergola(mods, m, g);
     return noRay(g);
   }
 

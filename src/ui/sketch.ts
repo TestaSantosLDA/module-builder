@@ -1,5 +1,5 @@
 // Furniture sketches drawn inside each module on the plan, in local (unrotated) coordinates 0..w, 0..h (dm).
-import type { TypeId } from '../model/catalog';
+import { TYPES, type TypeId } from '../model/catalog';
 
 type Attrs = Record<string, string | number>;
 function el(tag: string, attrs: Attrs, parent: Element): SVGElement {
@@ -9,7 +9,9 @@ function el(tag: string, attrs: Attrs, parent: Element): SVGElement {
   return e;
 }
 
-export function interior(g: Element, type: TypeId, w: number, h: number): void {
+export function interior(g: Element, typeId: TypeId, w: number, h: number): void {
+  const t = TYPES[typeId], type = t?.sketch;
+  if (!type) return;
   const L: Attrs = { fill: 'none', stroke: 'var(--ink-dim)', 'stroke-width': 0.6, 'vector-effect': 'non-scaling-stroke' };
   const bed = (x: number, y: number) => { el('rect', { ...L, x, y, width: 16, height: 20, rx: 1 }, g); el('rect', { ...L, x: x + 1.5, y: y + 1, width: 13, height: 4, rx: 1 }, g); };
     if(type==="sala"){ el('rect',{...L,x:w/2-9,y:3,width:18,height:8,rx:1.5},g); // sofa
@@ -26,7 +28,12 @@ export function interior(g: Element, type: TypeId, w: number, h: number): void {
     } else if(type==="escada"){ el('rect',{...L,x:(w-10)/2,y:3,width:10,height:h-6},g);
       for(let y=6;y<h-3;y+=3) el('line',{...L,x1:(w-10)/2,y1:y,x2:(w+10)/2,y2:y},g);
       el('line',{...L,x1:w/2,y1:h-5,x2:w/2,y2:6},g); el('path',{...L,d:`M${w/2-2} 9 L${w/2} 6 L${w/2+2} 9`},g);
-    } else if(type==="deck"||type==="deckL"){
+    } else if(type==="deck"){
       for(let y=3;y<h;y+=3) el('line',{...L,x1:1,y1:y,x2:w-1,y2:y,opacity:0.5},g);
+      if(t.pergola){ // pergola: beams along the long side, slats across, drawn dashed (it is overhead)
+        const P:Attrs={...L,stroke:'var(--wood)','stroke-dasharray':'3 2',opacity:0.8};
+        if(w>=h){ el('line',{...P,x1:0,y1:1,x2:w,y2:1},g); el('line',{...P,x1:0,y1:h-1,x2:w,y2:h-1},g); for(let x=2;x<w;x+=4.5) el('line',{...P,x1:x,y1:1,x2:x,y2:h-1},g); }
+        else { el('line',{...P,x1:1,y1:0,x2:1,y2:h},g); el('line',{...P,x1:w-1,y1:0,x2:w-1,y2:h},g); for(let y=2;y<h;y+=4.5) el('line',{...P,x1:1,y1:y,x2:w-1,y2:y},g); }
+      }
     }
 }

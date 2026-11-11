@@ -24,6 +24,8 @@ export interface ModuleType {
   /** furniture sketch drawn on the plan (defaults to none) */
   sketch?: SketchId;
   stairs?: boolean;
+  /** deck covered by a timber pergola */
+  pergola?: boolean;
 }
 
 const BASE_TYPES = {
@@ -36,6 +38,7 @@ const BASE_TYPES = {
   escada: { name: 'Escadas', w: 28, h: 35, kind: 'room', cat: 'escada', sketch: 'escada', stairs: true },
   deck: { name: 'Deck', w: 28, h: 35, kind: 'deck', cat: 'deck', sketch: 'deck' },
   deckL: { name: 'Deck grande', w: 37, h: 35, kind: 'deck', cat: 'deck', sketch: 'deck' },
+  deckP: { name: 'Deck com pérgola', w: 37, h: 35, kind: 'deck', cat: 'deck', sketch: 'deck', pergola: true },
 } as const satisfies Record<string, ModuleType>;
 
 /** Base modules plus the ones found in the catalogue houses (src/model/catalog-houses.ts). */
