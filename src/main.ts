@@ -4,7 +4,7 @@ import './style.css';
 import { MAX_LEVEL, TYPES, type Mod, type TypeId } from './model/catalog';
 import { doors, footprint as fp, level as lv, problems, snapToNeighbours, summarize, type Door } from './model/geometry';
 import { History } from './model/history';
-import { rigaT2 } from './model/houses';
+import { DEFAULT_HOUSE, FAMILIES, HOUSES, houseById, placeHouse } from './model/houses';
 import { parsePlan } from './model/plan';
 import { createView3D, type View3D } from './ui/view3d';
 import { interior } from './ui/sketch';
@@ -267,7 +267,37 @@ document.addEventListener('keydown', e => {
 });
 
 // ---------- start house, clear, fit ----------
-function loadRiga(): void { curLevel = 0; mods = rigaT2(() => nextId++); sel = null; fit(); }
+// ---------- start house ----------
+const HOUSE_KEY = 'treehouse-casa';
+let houseId = DEFAULT_HOUSE;
+try { const h = localStorage.getItem(HOUSE_KEY); if (houseById(h)) houseId = h!; } catch { /* storage blocked */ }
+const housesBox = $('houses');
+for (const fam of FAMILIES) {
+  const hs = HOUSES.filter(h => h.family === fam);
+  if (!hs.length) continue;
+  housesBox.insertAdjacentHTML('beforeend', `<small>${fam}</small>`);
+  const row = document.createElement('div');
+  for (const h of hs) {
+    const b = document.createElement('button');
+    b.type = 'button'; b.dataset.house = h.id; b.textContent = h.label;
+    b.title = `${h.name} · ${h.catalogArea} · catálogo p. ${h.page}`;
+    b.onclick = () => loadHouse(h.id);
+    row.appendChild(b);
+  }
+  housesBox.appendChild(row);
+}
+function showHouse(): void {
+  const h = houseById(houseId)!;
+  for (const b of housesBox.querySelectorAll<HTMLButtonElement>('button')) b.setAttribute('aria-pressed', String(b.dataset.house === houseId));
+  $('houseNote').textContent = `${h.name} (${h.catalogArea}, catálogo p. ${h.page}), partida nas suas peças.`;
+}
+function loadHouse(id: string): void {
+  const h = houseById(id); if (!h) return;
+  houseId = id;
+  try { localStorage.setItem(HOUSE_KEY, id); } catch { /* storage blocked */ }
+  curLevel = 0; mods = placeHouse(h, () => nextId++); sel = null; showHouse(); fit();
+}
+const loadRiga = () => loadHouse(houseId);
 function fit(): void {
   if (is3D) { view3d?.frame(mods); render(); return; }
   if (!mods.length) { render(); return; }
@@ -332,6 +362,7 @@ for (const b of document.querySelectorAll<HTMLButtonElement>('#finish button[dat
 setupQuote({
   getMods: () => mods,
   finish: () => finish,
+  house: () => houseId,
   capture: () => ensure3D()?.capture(mods, problems(mods).bad, doors(mods)) ?? null,
 });
 
@@ -352,6 +383,7 @@ $('undo').onclick = undo;
 
 let loaded: Mod[] | null = null;
 try { loaded = parsePlan(JSON.parse(localStorage.getItem(STORE) || 'null')); } catch { /* ignore */ }
+showHouse();
 requestAnimationFrame(() => {
   if (loaded && loaded.length) { mods = loaded; nextId = Math.max(...mods.map(m => m.id)) + 1; fit(); }
   else loadRiga();

@@ -20,7 +20,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const mail = q.kind === 'pedido' ? salesEmail(q, ref) : detailsEmail(q);
   const attachments = q.kind === 'pedido'
     ? [
-        { filename: `${ref}-planta.json`, content: Buffer.from(JSON.stringify({ ref, fachada: q.fachada, plan: q.plan })).toString('base64') },
+        { filename: `${ref}-planta.json`, content: Buffer.from(JSON.stringify({ ref, casa: q.casa, fachada: q.fachada, plan: q.plan })).toString('base64') },
         ...(q.image ? [{ filename: `${ref}-vista-3d.jpg`, content: q.image.slice(q.image.indexOf(',') + 1) }] : []),
       ]
     : undefined;

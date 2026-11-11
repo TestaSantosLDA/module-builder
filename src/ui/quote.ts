@@ -6,6 +6,8 @@ import { esc, type FinishId } from '../model/quote';
 export interface QuoteHost {
   getMods(): Mod[];
   finish(): FinishId;
+  /** id of the catalogue house the plan started from */
+  house(): string;
   /** JPEG data URL of the house, or null when 3D is not available */
   capture(): string | null;
 }
@@ -62,7 +64,7 @@ export function setupQuote(host: QuoteHost): void {
       if (!(document.getElementById('qEmail') as HTMLInputElement).checkValidity() || !lead.email) return fail('Indique um email válido.');
       if (!(document.getElementById('qRgpd') as HTMLInputElement).checked) return fail('Para enviarmos o pedido, aceite que a Jular o contacte.');
       err.hidden = true; btn.disabled = true; btn.textContent = 'A enviar…';
-      const r = await post({ kind: 'pedido', nome: lead.nome, email: lead.email, tel: lead.tel, rgpd: true, fachada: host.finish(), plan: host.getMods(), image: host.capture() ?? undefined, website: val('qSite') });
+      const r = await post({ kind: 'pedido', nome: lead.nome, email: lead.email, tel: lead.tel, rgpd: true, fachada: host.finish(), casa: host.house(), plan: host.getMods(), image: host.capture() ?? undefined, website: val('qSite') });
       if (!r.ref) return fail(r.error || 'Não foi possível enviar o pedido.');
       lead.ref = r.ref; sent();
     };
