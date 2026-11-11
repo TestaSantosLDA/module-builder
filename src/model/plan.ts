@@ -8,12 +8,14 @@ export function parsePlan(data: unknown): Mod[] | null {
   const out: Mod[] = [];
   for (const d of data) {
     if (!d || typeof d !== 'object') return null;
-    const { id, type, x, y, rot, z } = d as Record<string, unknown>;
+    const { id, type, x, y, rot, z, flip } = d as Record<string, unknown>;
     if (!isTypeId(type)) return null;
     if (![id, x, y, z].every(v => Number.isInteger(v) && Math.abs(v as number) < 100000)) return null;
     if (rot !== 0 && rot !== 90 && rot !== 180 && rot !== 270) return null;
     if ((z as number) < 0 || (z as number) > MAX_LEVEL) return null;
-    out.push({ id: id as number, type, x: x as number, y: y as number, rot, z: z as number });
+    const m: Mod = { id: id as number, type, x: x as number, y: y as number, rot, z: z as number };
+    if (Array.isArray(flip) && flip.length <= MAX_MODULES && flip.every(v => Number.isInteger(v))) m.flip = flip as number[];
+    out.push(m);
   }
   return out;
 }

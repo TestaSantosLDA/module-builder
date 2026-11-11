@@ -69,4 +69,6 @@ export interface Mod {
   y: number;
   rot: 0 | 90 | 180 | 270;
   z: number;
+  /** neighbours (by id) whose shared wall the user flipped: door ↔ plain wall */
+  flip?: number[];
 }

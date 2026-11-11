@@ -57,6 +57,8 @@ export interface Door {
   z: number;
   a: Mod;
   b: Mod;
+  /** plain wall instead of an opening (the rule's choice, flipped by the user) */
+  wall: boolean;
 }
 
 /**
@@ -64,6 +66,26 @@ export interface Door {
  * room–room gets a door, room–deck a glass sliding door, sala–cozinha is open plan, deck–deck nothing.
  */
 export function doors(mods: readonly Mod[]): Door[] {
+  return connections(mods).filter(d => !d.wall);
+}
+
+/** Has the user flipped the wall between a and b? (stored on either module) */
+export const flipped = (a: Mod, b: Mod) => !!(a.flip?.includes(b.id) || b.flip?.includes(a.id));
+
+/** Default before any flip: should this shared wall be a plain wall? */
+export function ruleWall(_a: Mod, _b: Mod): boolean {
+  return false;
+}
+
+/** Flip the shared wall between a and b (door ↔ wall). */
+export function toggleWall(a: Mod, b: Mod): void {
+  const on = flipped(a, b);
+  for (const [m, o] of [[a, b], [b, a]] as const) { m.flip = (m.flip ?? []).filter(i => i !== o.id); if (!m.flip.length) delete m.flip; }
+  if (!on) (a.flip ??= []).push(b.id);
+}
+
+/** Every shared wall between touching modules (deck–deck excluded), with its opening or `wall: true`. */
+export function connections(mods: readonly Mod[]): Door[] {
   const out: Door[] = [];
   for (let i = 0; i < mods.length; i++) for (let j = i + 1; j < mods.length; j++) {
     const mi = mods[i], mj = mods[j];
@@ -72,7 +94,7 @@ export function doors(mods: readonly Mod[]): Door[] {
     if (di && dj) continue;
     const a = footprint(mi), b = footprint(mj);
     const open = isOpenPlan(mi.type, mj.type), glass = di || dj;
-    const base = { open, glass, z: level(mi), a: mi, b: mj };
+    const base = { open, glass, z: level(mi), a: mi, b: mj, wall: ruleWall(mi, mj) !== flipped(mi, mj) };
     if (a.x + a.w === b.x || b.x + b.w === a.x) {
       const ov = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y);
       if (ov >= MIN_DOOR_WALL) out.push({ ...base, x: a.x + a.w === b.x ? b.x : a.x, y: Math.max(a.y, b.y) + ov / 2, vertical: true, len: ov });

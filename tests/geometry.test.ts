@@ -88,3 +88,20 @@ describe('summary', () => {
     expect(s).toMatchObject({ floors: 1, rooms: 6, area: 69, deck: 33, doors: 12, msgs: [] });
   });
 });
+
+describe('door ↔ wall flip', () => {
+  it('a flipped shared wall has no opening, and flipping again restores the door', async () => {
+    const { connections, toggleWall } = await import('../src/model/geometry');
+    const a = M('quarto', 0, 0), b = M('quarto', 28, 0);
+    toggleWall(a, b);
+    expect(doors([a, b])).toHaveLength(0);
+    expect(connections([a, b])[0].wall).toBe(true);
+    toggleWall(b, a);
+    expect(doors([a, b])).toHaveLength(1);
+    expect(a.flip).toBeUndefined(); expect(b.flip).toBeUndefined();
+  });
+  it('keeps flips when a plan is saved and loaded', async () => {
+    const { parsePlan } = await import('../src/model/plan');
+    expect(parsePlan([{ id: 1, type: 'quarto', x: 0, y: 0, rot: 0, z: 0, flip: [2] }])?.[0].flip).toEqual([2]);
+  });
+});

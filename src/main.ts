@@ -2,7 +2,7 @@
 // Pure rules live in src/model (tested); this file is the browser UI.
 import './style.css';
 import { CATEGORIES, MAX_LEVEL, TYPES, type Mod, type TypeId } from './model/catalog';
-import { doors, footprint as fp, level as lv, problems, snapToNeighbours, summarize, type Door } from './model/geometry';
+import { connections, doors, toggleWall, footprint as fp, level as lv, problems, snapToNeighbours, summarize, type Door } from './model/geometry';
 import { History } from './model/history';
 import { DEFAULT_HOUSE, FAMILIES, HOUSES, houseById, placeHouse } from './model/houses';
 import { parsePlan } from './model/plan';
@@ -28,6 +28,7 @@ let view3d: View3D | null = null;
 
 const STORE = 'treehouse-construtor-v1';
 const history = new History(5);
+let wallTargets: Door[] = []; // shared walls drawn on the current floor, for clicks
 
 function el(tag: string, attrs: Record<string, string | number> = {}, parent?: Element): SVGElement {
   const e = document.createElementNS(NS, tag);
@@ -101,7 +102,7 @@ function render(): void {
   }
   save();
   if (is3D && view3d) { view3d.build(mods, sel, bad, ds); placeSelbar(); return; }
-  render2D(bad, ds);
+  render2D(bad, connections(mods));
 }
 
 function render2D(bad: Set<Mod>, ds: Door[]): void {
@@ -128,7 +129,9 @@ function render2D(bad: Set<Mod>, ds: Door[]): void {
     interior(lg, m.type, t.w, t.h);
   }
   // doors on shared walls
-  for (const d of ds.filter(d => d.z === curLevel)) {
+  const here2 = ds.filter(d => d.z === curLevel);
+  for (const d of here2) {
+    if (d.wall) continue;
     const BG = { stroke: 'var(--paper-deep)', 'stroke-width': 6, 'vector-effect': 'non-scaling-stroke' };
     if (d.open || d.glass) {
       const single = d.glass && !d.open && d.len < 22;
@@ -157,6 +160,13 @@ function render2D(bad: Set<Mod>, ds: Door[]): void {
       el('path', { ...S, d: `M${d.x - half} ${d.y + 9} A9 9 0 0 0 ${d.x + half} ${d.y}`, 'stroke-dasharray': '1.5 1.5' }, world);
     }
   }
+  // click a shared wall to switch door ↔ plain wall
+  here2.forEach((d, i) => {
+    const hl = Math.max(2, d.len / 2 - 2), H = { class: 'dw', 'data-i': i, stroke: 'transparent', 'stroke-width': 14, 'vector-effect': 'non-scaling-stroke' };
+    const t = el('line', d.vertical ? { ...H, x1: d.x, y1: d.y - hl, x2: d.x, y2: d.y + hl } : { ...H, x1: d.x - hl, y1: d.y, x2: d.x + hl, y2: d.y }, world);
+    el('title', {}, t).textContent = d.wall ? 'Parede: clique para pôr uma porta' : 'Clique para fechar com parede';
+  });
+  wallTargets = here2;
   // labels (never rotated)
   for (const m of here) {
     const f = fp(m), fs = Math.max(2.2, 11 / view.s);
@@ -188,6 +198,8 @@ function placeSelbar(): void {
 
 // ---------- 2D interactions ----------
 svg.addEventListener('pointerdown', e => {
+  const dw = (e.target as Element).closest('.dw') as SVGElement | null;
+  if (dw) { const d = wallTargets[Number(dw.dataset.i)]; if (d) { toggleWall(d.a, d.b); render(); } return; }
   const g = (e.target as Element).closest('g.m') as SVGGElement | null;
   if (g) {
     const m = mods.find(x => x.id === Number(g.dataset.id))!;
