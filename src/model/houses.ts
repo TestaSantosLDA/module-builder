@@ -1,4 +1,4 @@
-import type { Mod, TypeId } from './catalog.js';
+import type { Mod } from './catalog.js';
 import { CATALOG_HOUSES } from './catalog-houses.js';
 
 export type Family = 'Spot' | 'SW' | 'Riga' | 'Douro' | 'Original';
@@ -18,17 +18,8 @@ export interface House {
   plan: Omit<Mod, 'id'>[];
 }
 
-const P = (type: TypeId, x: number, y: number, rot: Mod['rot'] = 0, z = 0): Omit<Mod, 'id'> => ({ type, x, y, rot, z });
-
 export const HOUSES: House[] = ([
-  {
-    id: 'riga-t2', family: 'Riga', label: 'T2', name: 'Treehouse Riga T2', page: 37, catalogArea: '70 m²',
-    plan: [
-      P('deck', 0, 0), P('entrada', 28, 0), P('quarto', 66, 0),
-      P('cozinha', 0, 35), P('sala', 28, 35), P('deck', 66, 35),
-      P('deckL', -9, 70), P('suite', 28, 70), P('quarto', 66, 70),
-    ],
-  },
+  // Riga T2 is the default start house; all houses come from the reviewed JSON files (scripts/import-houses.py)
   ...(CATALOG_HOUSES as House[]),
 ] as House[]).sort((a, b) => FAMILIES.indexOf(a.family) - FAMILIES.indexOf(b.family) || a.label.localeCompare(b.label));
 

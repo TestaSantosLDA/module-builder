@@ -39,7 +39,7 @@ describe('salesEmail', () => {
     expect(m.html).not.toContain('<b>Ana</b>');
     expect(m.html).toContain('Madeira');
     expect(m.html).toContain('Treehouse Riga T2');
-    expect(m.text).toContain('Piso 0: 2 × Deck');
+    expect(m.text).toContain('Piso 0: 2 × Pátio com pérgola (Riga)');
   });
 });
 
