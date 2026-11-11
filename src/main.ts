@@ -206,7 +206,7 @@ svg.addEventListener('pointerup', endDrag);
 svg.addEventListener('pointercancel', endDrag);
 svg.addEventListener('wheel', e => { e.preventDefault(); const r = svg.getBoundingClientRect(); zoomAt(e.clientX - r.left, e.clientY - r.top, e.deltaY < 0 ? 1.12 : 1 / 1.12); }, { passive: false });
 function zoomAt(px: number, py: number, k: number): void {
-  const ns = Math.min(20, Math.max(2.5, view.s * k)); k = ns / view.s;
+  const ns = Math.min(20, Math.max(1.2, view.s * k)); k = ns / view.s;
   view.tx = px - (px - view.tx) * k; view.ty = py - (py - view.ty) * k; view.s = ns; render();
 }
 $('zin').onclick = () => { if (is3D) return view3d?.dolly(0.8); const r = svg.getBoundingClientRect(); zoomAt(r.width / 2, r.height / 2, 1.25); };
