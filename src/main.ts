@@ -332,7 +332,7 @@ function fit(): void {
   const x0 = Math.min(...fs.map(f => f.x)), y0 = Math.min(...fs.map(f => f.y)), x1 = Math.max(...fs.map(f => f.x + f.w)), y1 = Math.max(...fs.map(f => f.y + f.h));
   const narrow = r.width < 640, padL = narrow ? 20 : 290, padR = narrow ? 20 : 300, padT = narrow ? 150 : 40, padB = narrow ? 190 : 40;
   const s = Math.min((r.width - padL - padR) / (x1 - x0), (r.height - padT - padB) / (y1 - y0));
-  view.s = Math.min(12, Math.max(2.5, s));
+  view.s = Math.min(8, Math.max(1.2, s * 0.75)); // leave some room around the house
   view.tx = padL + ((r.width - padL - padR) - (x1 - x0) * view.s) / 2 - x0 * view.s;
   view.ty = padT + ((r.height - padT - padB) - (y1 - y0) * view.s) / 2 - y0 * view.s;
   render();
