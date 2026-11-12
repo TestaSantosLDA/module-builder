@@ -1,5 +1,5 @@
 import { isOpenPlan, MAX_LEVEL, MIN_DOOR_WALL, roleOf, TYPES, type Mod, type Role } from './catalog.js';
-import { defaultOutside, fits, OPENINGS, type Dir, type Opening } from './openings.js';
+import { defaultOutside, fits, itemsOf, layOut, OPENINGS, type Dir, type Laid, type Opening, type OutChoice } from './openings.js';
 
 export interface Rect { x: number; y: number; w: number; h: number }
 
@@ -84,7 +84,7 @@ export function setJoin(a: Mod, b: Mod, k: Opening | undefined): void {
 }
 
 /** Choose what goes in an outside wall of m; undefined goes back to the default. */
-export function setOut(m: Mod, side: Dir, k: Opening | undefined): void {
+export function setOut(m: Mod, side: Dir, k: OutChoice | undefined): void {
   if (k) (m.out ??= {})[side] = k;
   else if (m.out) { delete m.out[side]; if (!Object.keys(m.out).length) delete m.out; }
 }
@@ -174,7 +174,7 @@ export function unreachable(mods: readonly Mod[]): Mod[] {
     else if (!da && !db) { adj.get(d.a)!.push(d.b); adj.get(d.b)!.push(d.a); }
   }
   // a front door or glass door in an outside wall of the ground floor
-  for (const r of rooms) if (!level(r) && outWalls(mods, r).some(w => OPENINGS[w.kind].pass)) entry.add(r);
+  for (const r of rooms) if (!level(r) && outWalls(mods, r).some(w => w.items.some(i => OPENINGS[i.k].pass))) entry.add(r);
   // no hall and no deck on the ground floor: the front door is in the living room
   if (![...entry].some(r => !level(r))) for (const r of rooms) if (!level(r) && roleOf(r.type) === 'living') entry.add(r);
   if (!entry.size) return [];
@@ -243,7 +243,10 @@ export interface OutWall {
   len: number;
   /** free length between the corner posts, m */
   clear: number;
+  /** the main opening (the first one), 'parede' when there is none */
   kind: Opening;
+  /** every opening in the wall, with its centre along the wall (m from the middle, +x on N/S walls, +y on W/E walls) */
+  items: Laid[];
   chosen: boolean;
 }
 
@@ -256,7 +259,7 @@ export function outWalls(mods: readonly Mod[], m: Mod): OutWall[] {
     if (sd[side] !== 'free') continue;
     const vertical = side === 'W' || side === 'E', len = vertical ? f.h : f.w;
     all.push({
-      m, side, vertical, len, clear: vertical ? len / 10 - 0.4 : len / 10, kind: 'parede', chosen: false,
+      m, side, vertical, len, clear: vertical ? len / 10 - 0.4 : len / 10, kind: 'parede', items: [], chosen: false,
       x: side === 'W' ? f.x : side === 'E' ? f.x + f.w : f.x + f.w / 2,
       y: side === 'N' ? f.y : side === 'S' ? f.y + f.h : f.y + f.h / 2,
     });
@@ -264,7 +267,8 @@ export function outWalls(mods: readonly Mod[], m: Mod): OutWall[] {
   // defaults go on the longest walls first
   const spec = defaultOutside(m);
   [...all].sort((a, b) => b.len - a.len).forEach((w, i) => { const k = spec[i]; if (k && fits(k, w.clear)) w.kind = k; });
-  for (const w of all) { const c = m.out?.[w.side]; if (c) { w.kind = c; w.chosen = true; } }
+  for (const w of all) { const c = m.out?.[w.side]; if (c) { w.kind = itemsOf(c)[0]?.k ?? 'parede'; w.chosen = true; } }
+  for (const w of all) w.items = layOut(m.out?.[w.side] ?? w.kind, w.len, w.clear);
   return all;
 }
 
@@ -273,7 +277,7 @@ export function openingCounts(mods: readonly Mod[]): string[] {
   const n = new Map<Opening, number>();
   const add = (k: Opening) => { if (k !== 'parede' && k !== 'aberto') n.set(k, (n.get(k) || 0) + 1); };
   for (const d of connections(mods)) add(d.kind);
-  for (const m of mods) for (const w of outWalls(mods, m)) add(w.kind);
+  for (const m of mods) for (const w of outWalls(mods, m)) for (const i of w.items) add(i.k);
   return [...n].map(([k, v]) => `${v} × ${OPENINGS[k].name}`);
 }
 

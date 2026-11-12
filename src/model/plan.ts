@@ -1,5 +1,5 @@
 import { isTypeId, MAX_LEVEL, type Mod } from './catalog.js';
-import { DIRS, isOpening, type Opening } from './openings.js';
+import { DIRS, isOpening, isOutChoice, type Opening } from './openings.js';
 
 export const MAX_MODULES = 60;
 
@@ -23,7 +23,7 @@ export function parsePlan(data: unknown): Mod[] | null {
     }
     if (side && typeof side === 'object' && !Array.isArray(side)) {
       const o: Mod['out'] = {};
-      for (const k of DIRS) { const v = (side as Record<string, unknown>)[k]; if (isOpening(v)) o[k] = v; }
+      for (const k of DIRS) { const v = (side as Record<string, unknown>)[k]; if (isOutChoice(v)) o[k] = typeof v === 'string' ? v : v.map(p => (p.at === undefined ? { k: p.k } : { k: p.k, at: p.at })); }
       if (Object.keys(o).length) m.out = o;
     }
     out.push(m);
