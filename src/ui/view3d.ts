@@ -74,6 +74,9 @@ const FACADE: Record<Finish, { size: number; normal: number }> = { branco: { siz
 /** Interior glow per room category, seen through the windows (emissive on the ceiling: colour, strength). */
 const GLOW: Record<string, [number, number]> = { sala: [0xffcf98, 0.9], quarto: [0xffd9ad, 0.55], wc: [0xfff1e0, 0.6], circ: [0xffe2c0, 0.6], escada: [0xffe2c0, 0.55] };
 
+/** Furniture sets of the web kit: room sketch -> module size they were made for (w × d, m, unrotated). */
+const FURN: Record<string, [number, number]> = { sala: [3.8, 3.5], cozinha: [2.8, 3.5], entrada: [3.8, 3.5], quarto: [2.8, 3.5], suite: [3.8, 3.5], escada: [2.8, 3.5] };
+
 const noRay = <O extends THREE.Object3D>(o: O): O => { o.traverse(n => { n.raycast = () => {}; }); return o; };
 function boxAt(w: number, h: number, d: number, mat: THREE.Material, x: number, y: number, z: number, parent: THREE.Object3D, round = 0): THREE.Mesh {
   const g = meterUV(round > 0 ? new RoundedBoxGeometry(w, h, d, 2, Math.min(round, w / 3, h / 3, d / 3)) : new THREE.BoxGeometry(w, h, d));
@@ -267,6 +270,49 @@ export function createView3D(box: HTMLElement, host: View3DHost): View3D | null 
     host.changed();
   }, undefined, err => console.warn('Kit 3D não carregou', err));
 
+  // ---------- Blender web kit (jular-treehouses blender/kit_web.py): furniture per room sketch and interior doors ----------
+  // Same pieces as the Cycles renders of the house. Each furniture set has its origin at the centre of the unrotated
+  // module, on the finished floor; materials by name from materiais.json (real textures in the desktop tier only).
+  const furn: Partial<Record<string, THREE.Object3D>> = {};
+  if (fx.furniture) {
+    type KitMat = { color: [number, number, number]; roughness: number; metalness: number; transparent?: boolean; maps?: Partial<Record<'color' | 'normal' | 'arm', string>> };
+    const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
+    void fetch(host.kitUrl + 'mobilia/materiais.json').then(r => r.json()).then((spec: Record<string, KitMat | string>) => {
+      const mats = new Map<string, THREE.Material>();
+      const matFor = (name: string): THREE.Material => {
+        let m = mats.get(name);
+        if (m) return m;
+        const s = spec[name];
+        if (typeof s !== 'object') m = M.plaster;
+        else if (s.transparent || /vidro/.test(name)) m = M.glass;
+        else {
+          const mm = new THREE.MeshStandardMaterial({ name, color: new THREE.Color().setRGB(...s.color), roughness: s.roughness, metalness: s.metalness, envMapIntensity: fx.sky ? 0.6 : 1 });
+          if (name === 'led') { mm.emissive.setRGB(...s.color); mm.emissiveIntensity = 1.2; }
+          // the KTX2 files are flipped like JPGs for TextureLoader; glTF UVs are not, so repeat -1 in v undoes it
+          if (s.maps && fx.tier === 'alto') for (const [k, f] of Object.entries(s.maps)) {
+            void ktxTex(f, k === 'color', 1, -1).then(t => {
+              if (k === 'color') mm.map = t; else if (k === 'normal') mm.normalMap = t; else { mm.roughnessMap = t; mm.aoMap = t; mm.roughness = 1; }
+              mm.needsUpdate = true; invalidate();
+            }).catch(e => console.warn(`Textura ${f} não carregou`, e));
+          }
+          m = mm;
+        }
+        mats.set(name, m); return m;
+      };
+      const load = (f: string, done: (o: THREE.Object3D) => void) => loader.load(host.kitUrl + `mobilia/${f}.glb`, g => {
+        const o = g.scene.children[0] ?? g.scene;
+        o.traverse(n => {
+          const mesh = n as THREE.Mesh;
+          if (mesh.isMesh) { const old = mesh.material as THREE.Material; mesh.material = matFor(old.name); old.dispose(); mesh.castShadow = mesh.material !== M.glass; mesh.receiveShadow = true; }
+          n.raycast = () => {};
+        });
+        o.position.set(0, 0, 0); o.rotation.set(0, 0, 0); done(o); host.changed();
+      }, undefined, e => console.warn(`Peça ${f} não carregou`, e));
+      for (const k of Object.keys(FURN)) load(`mob_${k}`, o => { furn[k] = o; });
+      load('porta_interior', o => { units.porta_int = o; });
+    }).catch(e => console.warn('Mobília não carregou', e));
+  }
+
   /** Single-leaf glass door, 0.9 m, built in the same frame position and materials as the 1.8 m kit door. */
   function singleGlassDoor(ref: THREE.Object3D): THREE.Object3D {
     const c = ref.clone(true); c.position.set(0, 0, 0); c.rotation.set(0, 0, 0); c.updateMatrixWorld(true);
@@ -329,7 +375,8 @@ export function createView3D(box: HTMLElement, host: View3DHost): View3D | null 
       const k: keyof typeof S = dd.vertical ? (Math.abs(dd.x - f.x) < 0.5 ? 'W' : 'E') : (Math.abs(dd.y - f.y) < 0.5 ? 'N' : 'S');
       const off = local(k, dd.x / 10, dd.y / 10), o = OPENINGS[dd.kind];
       if (dd.kind === 'aberto') S[k].H.push({ x: off, y: 0, w: dd.len / 10 - 0.3, h: WH - FL - ROOFT - 0.05 });
-      else S[k].H.push({ u: pieceOf(dd.kind, dd.len), x: off, y: o.sill, w: widthOf(dd.kind, dd.len), h: o.h });
+      // interior door: frame and leaf from the web kit, in one of the two walls only
+      else S[k].H.push({ u: dd.kind === 'porta' ? (dd.a === m ? 'porta_int' : undefined) : pieceOf(dd.kind, dd.len), x: off, y: o.sill, w: widthOf(dd.kind, dd.len), h: o.h });
     }
     // outside walls: windows, glass doors and the front door, as chosen or by default
     for (const ow of outWalls(mods, m)) {
@@ -348,6 +395,11 @@ export function createView3D(box: HTMLElement, host: View3DHost): View3D | null 
     const fl = roomPlane(w - 2 * T, d - 2 * T, M.floor, FL + 1.2); fl.rotation.x = -Math.PI / 2; fl.position.set(cx, y0 + FL, cz); fl.receiveShadow = true; g.add(fl);
     const ce = roomPlane(w - 2 * T, d - 2 * T, ceilingFor(m), FL + 1.2); ce.rotation.x = Math.PI / 2; ce.position.set(cx, y0 + WH - ROOFT, cz); g.add(ce);
     const rf = boxAt(w - 2 * T, ROOFT - 0.02, d - 2 * T, M.roof, cx, y0 + WH - ROOFT / 2 - 0.01, cz, g); rf.castShadow = true;
+    // furniture of the room's sketch, centred, turned with the module (rot is clockwise on the plan); skipped when it does not fit
+    const t = TYPES[m.type], set = t.sketch ? furn[t.sketch] : undefined;
+    if (set && t.w / 10 >= FURN[t.sketch!][0] - 0.01 && t.h / 10 >= FURN[t.sketch!][1] - 0.01) {
+      const o = set.clone(true); o.rotation.y = -m.rot * Math.PI / 180; o.position.set(cx, y0 + FL, cz); g.add(o);
+    }
     return noRay(g);
   }
 

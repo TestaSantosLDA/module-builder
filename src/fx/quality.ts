@@ -1,7 +1,7 @@
 // Quality tiers and effect switches, read from the URL. Same flags as the apartment walkthrough (web/viewer.js):
 //   ?fx=0                 everything off (the 3D as before: studio light, paper background, no post-processing)
 //   ?fx=leve | ?fx=alto   force a tier (default: phones/tablets and small screens get "leve")
-//   ?fx=noao,nosky,nolook,nocontact,nobloom,nosmaa,notrees   turn single effects off (comma-separated)
+//   ?fx=noao,nosky,nolook,nocontact,nobloom,nosmaa,notrees,nomob   turn single effects off (comma-separated)
 export type Tier = 'leve' | 'alto';
 export interface Fx {
   on: boolean;
@@ -20,6 +20,8 @@ export interface Fx {
   smaa: boolean;
   /** billboard trees and shrubs around the house: desktop tier only */
   trees: boolean;
+  /** furniture and interior doors from the Blender web kit (public/kit/mobilia); real textures on them in the desktop tier only */
+  furniture: boolean;
   /** device pixel ratio cap */
   maxPixelRatio: number;
   shadowMapSize: number;
@@ -38,6 +40,7 @@ export function readFx(search: string, coarsePointer: boolean, width: number, he
     bloom: on && tier === 'alto' && !args.has('nobloom'),
     smaa: on && tier === 'alto' && !args.has('nosmaa'),
     trees: on && tier === 'alto' && !args.has('nosky') && !args.has('notrees'),
+    furniture: on && !args.has('nomob'),
     maxPixelRatio: tier === 'leve' ? 1.5 : 2,
     shadowMapSize: tier === 'leve' ? 1024 : 2048,
   };

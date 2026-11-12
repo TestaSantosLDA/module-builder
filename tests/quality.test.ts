@@ -4,7 +4,7 @@ import { readFx } from '../src/fx/quality';
 describe('quality tiers', () => {
   it('desktop gets the full tier with every effect', () => {
     const fx = readFx('', false, 1440, 900);
-    expect(fx).toMatchObject({ on: true, tier: 'alto', ao: true, sky: true, look: true, contact: true, bloom: true, smaa: true, trees: true, maxPixelRatio: 2 });
+    expect(fx).toMatchObject({ on: true, tier: 'alto', ao: true, sky: true, look: true, contact: true, bloom: true, smaa: true, trees: true, furniture: true, maxPixelRatio: 2 });
   });
   it('touch screens get the light tier without screen-space AO', () => {
     const fx = readFx('', true, 1180, 820);
@@ -16,6 +16,8 @@ describe('quality tiers', () => {
     expect(readFx('?fx=alto', true, 400, 800)).toMatchObject({ tier: 'alto', ao: true });
     expect(readFx('?fx=leve,nosky', false, 1440, 900)).toMatchObject({ tier: 'leve', sky: false, look: true });
     expect(readFx('?fx=noao,nolook', false, 1440, 900)).toMatchObject({ ao: false, look: false, sky: true });
-    expect(readFx('?fx=nobloom,nosmaa,notrees', false, 1440, 900)).toMatchObject({ bloom: false, smaa: false, trees: false, ao: true });
+    expect(readFx('?fx=nobloom,nosmaa,notrees', false, 1440, 900)).toMatchObject({ bloom: false, smaa: false, trees: false, ao: true, furniture: true });
+    expect(readFx('?fx=nomob', false, 1440, 900).furniture).toBe(false);
+    expect(readFx('?fx=0', false, 1440, 900).furniture).toBe(false);
   });
 });

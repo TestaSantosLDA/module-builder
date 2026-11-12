@@ -1,0 +1,398 @@
+{
+ "_doc": "Materials of the Blender web kit (jular-treehouses blender/kit_web.py): colour = linear RGB, maps relative to public/kit/, size_m = metres per texture repeat (the UVs already include it).",
+ "boucle": {
+  "color": [
+   0.53,
+   0.47,
+   0.37
+  ],
+  "roughness": 1.0,
+  "metalness": 0.0,
+  "maps": {
+   "normal": "mobilia/tex/boucle_nor.ktx2",
+   "arm": "mobilia/tex/boucle_arm.ktx2"
+  },
+  "size_m": 0.32
+ },
+ "folha": {
+  "color": [
+   0.045,
+   0.14,
+   0.035
+  ],
+  "roughness": 0.55,
+  "metalness": 0.0
+ },
+ "juta": {
+  "color": [
+   1,
+   1,
+   1
+  ],
+  "roughness": 0.95,
+  "metalness": 0.0,
+  "maps": {
+   "color": "mobilia/tex/juta_cor.ktx2"
+  },
+  "size_m": 0.5
+ },
+ "laca_verde": {
+  "color": [
+   0.16,
+   0.22,
+   0.13
+  ],
+  "roughness": 0.45,
+  "metalness": 0.0
+ },
+ "madeira": {
+  "color": [
+   1,
+   1,
+   1
+  ],
+  "roughness": 0.45,
+  "metalness": 0.0,
+  "maps": {
+   "color": "mobilia/tex/madeira_clara_cor.ktx2",
+   "normal": "mobilia/tex/madeira_clara_nor.ktx2",
+   "arm": "mobilia/tex/madeira_clara_arm.ktx2"
+  },
+  "size_m": 1.83
+ },
+ "madeira_escura": {
+  "color": [
+   1,
+   1,
+   1
+  ],
+  "roughness": 0.45,
+  "metalness": 0.0,
+  "maps": {
+   "color": "mobilia/tex/madeira_escura_cor.ktx2",
+   "normal": "mobilia/tex/madeira_escura_nor.ktx2",
+   "arm": "mobilia/tex/madeira_escura_arm.ktx2"
+  },
+  "size_m": 1.0
+ },
+ "metal_preto": {
+  "color": [
+   0.03,
+   0.03,
+   0.03
+  ],
+  "roughness": 0.35,
+  "metalness": 0.8
+ },
+ "palhinha": {
+  "color": [
+   1,
+   1,
+   1
+  ],
+  "roughness": 0.7,
+  "metalness": 0.0,
+  "maps": {
+   "color": "mobilia/tex/palhinha_cor.ktx2"
+  },
+  "size_m": 0.12
+ },
+ "papel": {
+  "color": [
+   0.85,
+   0.82,
+   0.75
+  ],
+  "roughness": 0.9,
+  "metalness": 0.0
+ },
+ "tecido_areia": {
+  "color": [
+   0.86,
+   0.78,
+   0.64
+  ],
+  "roughness": 0.95,
+  "metalness": 0.0,
+  "maps": {
+   "color": "mobilia/tex/tecido_cor.ktx2",
+   "normal": "mobilia/tex/tecido_nor.ktx2",
+   "arm": "mobilia/tex/tecido_arm.ktx2"
+  },
+  "size_m": 0.27
+ },
+ "tecido_musgo": {
+  "color": [
+   0.3,
+   0.36,
+   0.2
+  ],
+  "roughness": 0.95,
+  "metalness": 0.0,
+  "maps": {
+   "color": "mobilia/tex/tecido_cor.ktx2",
+   "normal": "mobilia/tex/tecido_nor.ktx2",
+   "arm": "mobilia/tex/tecido_arm.ktx2"
+  },
+  "size_m": 0.27
+ },
+ "tecido_terracota": {
+  "color": [
+   0.75,
+   0.42,
+   0.28
+  ],
+  "roughness": 0.95,
+  "metalness": 0.0,
+  "maps": {
+   "color": "mobilia/tex/tecido_cor.ktx2",
+   "normal": "mobilia/tex/tecido_nor.ktx2",
+   "arm": "mobilia/tex/tecido_arm.ktx2"
+  },
+  "size_m": 0.27
+ },
+ "terracota": {
+  "color": [
+   0.45,
+   0.18,
+   0.09
+  ],
+  "roughness": 0.8,
+  "metalness": 0.0
+ },
+ "vaso_off": {
+  "color": [
+   0.82,
+   0.78,
+   0.7
+  ],
+  "roughness": 0.7,
+  "metalness": 0.0
+ },
+ "vela": {
+  "color": [
+   0.95,
+   0.92,
+   0.85
+  ],
+  "roughness": 0.6,
+  "metalness": 0.0
+ },
+ "granito": {
+  "color": [
+   1,
+   1,
+   1
+  ],
+  "roughness": 0.22,
+  "metalness": 0.0,
+  "maps": {
+   "color": "mobilia/tex/granito_cor.ktx2"
+  },
+  "size_m": 0.5
+ },
+ "inox": {
+  "color": [
+   0.75,
+   0.75,
+   0.74
+  ],
+  "roughness": 0.28,
+  "metalness": 1.0
+ },
+ "laca_branca": {
+  "color": [
+   0.88,
+   0.88,
+   0.86
+  ],
+  "roughness": 0.35,
+  "metalness": 0.0
+ },
+ "laca_grafite": {
+  "color": [
+   0.075,
+   0.076,
+   0.078
+  ],
+  "roughness": 0.45,
+  "metalness": 0.0
+ },
+ "led": {
+  "color": [
+   1.0,
+   0.78,
+   0.52
+  ],
+  "roughness": 0.5,
+  "metalness": 0.0
+ },
+ "preto": {
+  "color": [
+   0.02,
+   0.02,
+   0.02
+  ],
+  "roughness": 0.35,
+  "metalness": 0.0
+ },
+ "vidro_box": {
+  "color": [
+   0.85,
+   0.92,
+   0.94
+  ],
+  "roughness": 0.0,
+  "metalness": 0.0,
+  "transparent": true
+ },
+ "branco": {
+  "color": [
+   0.86,
+   0.86,
+   0.84
+  ],
+  "roughness": 0.9,
+  "metalness": 0.0,
+  "maps": {
+   "normal": "mobilia/tex/reboco_nor.ktx2",
+   "arm": "mobilia/tex/reboco_arm.ktx2"
+  },
+  "size_m": 1.0
+ },
+ "espelho": {
+  "color": [
+   0.9,
+   0.9,
+   0.9
+  ],
+  "roughness": 0.0,
+  "metalness": 1.0
+ },
+ "louca": {
+  "color": [
+   0.92,
+   0.92,
+   0.92
+  ],
+  "roughness": 0.08,
+  "metalness": 0.0
+ },
+ "vinil": {
+  "color": [
+   0.8,
+   0.79,
+   0.76
+  ],
+  "roughness": 0.4,
+  "metalness": 0.0,
+  "maps": {
+   "color": "mobilia/tex/ceramica_cor.ktx2",
+   "normal": "mobilia/tex/ceramica_nor.ktx2",
+   "arm": "mobilia/tex/ceramica_arm.ktx2"
+  },
+  "size_m": 1.8
+ },
+ "cupula_abajur": {
+  "color": [
+   1.0,
+   0.97,
+   0.9
+  ],
+  "roughness": 0.95,
+  "metalness": 0.0,
+  "maps": {
+   "color": "mobilia/tex/tecido_cor.ktx2",
+   "normal": "mobilia/tex/tecido_nor.ktx2",
+   "arm": "mobilia/tex/tecido_arm.ktx2"
+  },
+  "size_m": 0.27
+ },
+ "laca_off": {
+  "color": [
+   0.72,
+   0.69,
+   0.63
+  ],
+  "roughness": 0.4,
+  "metalness": 0.0
+ },
+ "roupa_cama": {
+  "color": [
+   0.95,
+   0.93,
+   0.88
+  ],
+  "roughness": 0.95,
+  "metalness": 0.0,
+  "maps": {
+   "color": "mobilia/tex/tecido_cor.ktx2",
+   "normal": "mobilia/tex/tecido_nor.ktx2",
+   "arm": "mobilia/tex/tecido_arm.ktx2"
+  },
+  "size_m": 0.27
+ },
+ "porta_int": {
+  "color": [
+   0.9,
+   0.9,
+   0.88
+  ],
+  "roughness": 0.4,
+  "metalness": 0.0
+ },
+ "pinho": {
+  "color": [
+   0.92,
+   0.9,
+   0.84
+  ],
+  "roughness": 0.7,
+  "metalness": 0.0,
+  "maps": {
+   "color": "mobilia/tex/madeira_clara_cor.ktx2",
+   "normal": "mobilia/tex/madeira_clara_nor.ktx2",
+   "arm": "mobilia/tex/madeira_clara_arm.ktx2"
+  },
+  "size_m": 1.83
+ },
+ "rufo": {
+  "color": [
+   0.1,
+   0.1,
+   0.105
+  ],
+  "roughness": 0.45,
+  "metalness": 0.6
+ },
+ "glulam": {
+  "color": [
+   0.95,
+   0.92,
+   0.88
+  ],
+  "roughness": 0.6,
+  "metalness": 0.0,
+  "maps": {
+   "color": "mobilia/tex/madeira_escura_cor.ktx2",
+   "normal": "mobilia/tex/madeira_escura_nor.ktx2",
+   "arm": "mobilia/tex/madeira_escura_arm.ktx2"
+  },
+  "size_m": 1.0
+ },
+ "deck": {
+  "color": [
+   0.8,
+   0.7,
+   0.6
+  ],
+  "roughness": 0.75,
+  "metalness": 0.0,
+  "maps": {
+   "color": "mobilia/tex/madeira_clara_cor.ktx2",
+   "normal": "mobilia/tex/madeira_clara_nor.ktx2",
+   "arm": "mobilia/tex/madeira_clara_arm.ktx2"
+  },
+  "size_m": 1.83
+ }
+}
