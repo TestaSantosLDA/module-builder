@@ -1,0 +1,19 @@
+{
+ "species": "jacaranda_tree",
+ "tile_px": 256,
+ "cols": 8,
+ "azimuths": 8,
+ "elevations_deg": [
+  10.0,
+  30.0
+ ],
+ "size_m": 31.1634,
+ "center_m": 9.7344,
+ "height_m": 19.4689,
+ "layout": "row j = elevation EL[j], column i = azimuth i*45 deg from the tree's +x towards +y (Blender); quad size_m x size_m, centre at center_m above the ground",
+ "maps": {
+  "cor_alfa": "albedo (sRGB) + alpha",
+  "normal": "normal in the tree's own frame, xyz*0.5+0.5",
+  "ao": "ambient occlusion"
+ }
+}

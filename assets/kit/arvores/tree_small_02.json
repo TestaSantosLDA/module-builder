@@ -1,0 +1,19 @@
+{
+ "species": "tree_small_02",
+ "tile_px": 256,
+ "cols": 8,
+ "azimuths": 8,
+ "elevations_deg": [
+  10.0,
+  30.0
+ ],
+ "size_m": 7.1454,
+ "center_m": 2.2784,
+ "height_m": 4.5567,
+ "layout": "row j = elevation EL[j], column i = azimuth i*45 deg from the tree's +x towards +y (Blender); quad size_m x size_m, centre at center_m above the ground",
+ "maps": {
+  "cor_alfa": "albedo (sRGB) + alpha",
+  "normal": "normal in the tree's own frame, xyz*0.5+0.5",
+  "ao": "ambient occlusion"
+ }
+}
