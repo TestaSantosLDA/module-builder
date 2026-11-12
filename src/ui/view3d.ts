@@ -18,7 +18,7 @@ import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.j
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { MAX_LEVEL, STOREY, TYPES, type Mod } from '../model/catalog';
 import { footprint as fp, level as lv, outWalls, overlaps, sides, type Door } from '../model/geometry';
-import { OPENINGS, pieceOf, widthOf } from '../model/openings';
+import { OPENINGS, pieceOf, widthOf, type Opening } from '../model/openings';
 import { browserFx } from '../fx/quality';
 import { createPost, rendererOptions, setupRenderer } from '../fx/post';
 import { paintContact } from './contact';
@@ -331,7 +331,9 @@ export function createView3D(box: HTMLElement, host: View3DHost): View3D | null 
 
   // ---------- modules ----------
   // one wall: local x along the wall, y up, outer face at z=0, inside towards -z
-  type Hole = { x: number; y: number; w: number; h: number; u?: string };
+  type Hole = { x: number; y: number; w: number; h: number; u?: string; sx?: number };
+  /** width of the kit piece as modelled: narrow doors and the solid outside door are the same pieces scaled along the wall */
+  const pieceW = (k: Opening) => (k === 'portaExt' ? OPENINGS.entrada.w : OPENINGS[k].w);
   /** inset = how far the room's inner corners are from the wall ends; outside = the reveals are lined in the facade wood */
   function wall(L: number, holes: Hole[], inset: number, outside: boolean): THREE.Group {
     const g = new THREE.Group();
@@ -376,19 +378,19 @@ export function createView3D(box: HTMLElement, host: View3DHost): View3D | null 
       const off = local(k, dd.x / 10, dd.y / 10), o = OPENINGS[dd.kind];
       if (dd.kind === 'aberto') S[k].H.push({ x: off, y: 0, w: dd.len / 10 - 0.3, h: WH - FL - ROOFT - 0.05 });
       // interior door: frame and leaf from the web kit, in one of the two walls only
-      else S[k].H.push({ u: dd.kind === 'porta' ? (dd.a === m ? 'porta_int' : undefined) : pieceOf(dd.kind, dd.len), x: off, y: o.sill, w: widthOf(dd.kind, dd.len), h: o.h });
+      else { const wd = widthOf(dd.kind, dd.len); S[k].H.push({ u: dd.kind === 'porta' ? (dd.a === m ? 'porta_int' : undefined) : pieceOf(dd.kind, dd.len), x: off, y: o.sill, w: wd, h: o.h, sx: dd.kind === 'correr' ? 1 : wd / pieceW(dd.kind) }); }
     }
     // outside walls: windows, glass doors and the front door, as chosen or by default
-    for (const ow of outWalls(mods, m)) {
-      if (ow.kind === 'parede') continue;
-      const o = OPENINGS[ow.kind];
-      S[ow.side].H.push({ u: pieceOf(ow.kind, ow.len), x: 0, y: o.sill, w: widthOf(ow.kind, ow.len), h: o.h });
+    for (const ow of outWalls(mods, m)) for (const it of ow.items) {
+      const o = OPENINGS[it.k], X = ow.x / 10 + (ow.vertical ? 0 : it.at), Z = ow.y / 10 + (ow.vertical ? it.at : 0);
+      if (it.k === 'aberto') { S[ow.side].H.push({ x: 0, y: 0, w: it.w, h: WH - FL - ROOFT - 0.05 }); continue; }
+      S[ow.side].H.push({ u: pieceOf(it.k, ow.len), x: local(ow.side, X, Z), y: o.sill, w: it.w, h: o.h, sx: it.k === 'correr' ? 1 : it.w / pieceW(it.k) });
     }
     const sd = sides(mods, m);
     const g = new THREE.Group();
     for (const [k, s] of Object.entries(S) as [keyof typeof S, Wall][]) {
       g.add(placeAt(wall(s.L, s.H.map(h => ({ x: h.x, y: FL + h.y, w: h.w, h: h.h })), s.inset, sd[k] !== 'room'), s.c[0], y0, s.c[1], s.n[0], s.n[1], 0));
-      for (const h of s.H) if (h.u && units[h.u]) g.add(placeAt(units[h.u].clone(true), s.c[0], y0 + FL + h.y, s.c[1], s.n[0], s.n[1], h.x));
+      for (const h of s.H) if (h.u && units[h.u]) { const u = units[h.u].clone(true); if (h.sx && Math.abs(h.sx - 1) > 0.01) u.scale.x *= h.sx; g.add(placeAt(u, s.c[0], y0 + FL + h.y, s.c[1], s.n[0], s.n[1], h.x)); }
     }
     // corner posts clad in the facade wood hide the wall ends (the catalogue houses have no coloured corner trims)
     for (const [sx, sz] of [[0, 0], [1, 0], [0, 1], [1, 1]]) cladBox(T + 0.03, WH, T + 0.03, f.x / 10 + sx * w + (sx ? -T / 2 + 0.015 : T / 2 - 0.015), y0 + WH / 2, f.y / 10 + sz * d + (sz ? -T / 2 + 0.015 : T / 2 - 0.015), g);

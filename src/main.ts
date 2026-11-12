@@ -3,7 +3,7 @@
 import './style.css';
 import { CATEGORIES, MAX_LEVEL, TYPES, type Mod, type TypeId } from './model/catalog';
 import { connections, footprint as fp, kindOf, level as lv, outWalls, overlaps, problems, setJoin, setOut, snapToNeighbours, summarize, type Door, type OutWall } from './model/geometry';
-import { CHOICES, fits, OPENINGS, TURN, widthOf, type Opening } from './model/openings';
+import { BESIDE, CHOICES, fits, fitsAll, MAX_PER_WALL, OPENINGS, TURN, turnChoice, widthOf, type Opening, type OutChoice, type Placed } from './model/openings';
 import { History } from './model/history';
 import { DEFAULT_HOUSE, FAMILIES, HOUSES, houseById, placeHouse } from './model/houses';
 import { parsePlan } from './model/plan';
@@ -149,13 +149,13 @@ function render2D(bad: Set<Mod>, ds: Door[]): void {
   const here2 = ds.filter(d => d.z === curLevel);
   const outs = here.flatMap(m => outWalls(mods, m));
   for (const d of here2) drawOpening(world, d.x, d.y, d.vertical, d.len, d.kind, 1);
-  for (const o of outs) drawOpening(world, o.x, o.y, o.vertical, o.len, o.kind, o.side === 'N' || o.side === 'W' ? 1 : -1);
+  for (const o of outs) for (const it of o.items) drawOpening(world, o.x + (o.vertical ? 0 : it.at * 10), o.y + (o.vertical ? it.at * 10 : 0), o.vertical, o.len, it.k, o.side === 'N' || o.side === 'W' ? 1 : -1);
   // click any wall to choose what goes in it
   wallTargets = [...here2.map(d => ({ shared: d })), ...outs.map(o => ({ out: o }))];
   wallTargets.forEach((t, i) => {
     const w = t.shared ?? t.out!, hl = Math.max(2, w.len / 2 - 2), H = { class: 'dw', 'data-i': i, stroke: 'transparent', 'stroke-width': t.shared ? 14 : 10, 'vector-effect': 'non-scaling-stroke' };
     const ln = el('line', w.vertical ? { ...H, x1: w.x, y1: w.y - hl, x2: w.x, y2: w.y + hl } : { ...H, x1: w.x - hl, y1: w.y, x2: w.x + hl, y2: w.y }, world);
-    el('title', {}, ln).textContent = `${OPENINGS[w.kind].name}: clique para mudar`;
+    el('title', {}, ln).textContent = `${t.out ? t.out.items.map(i => OPENINGS[i.k].name).join(' + ') || OPENINGS.parede.name : OPENINGS[w.kind].name}: clique para mudar`;
   });
   // labels (never rotated)
   for (const m of here) {
@@ -184,9 +184,9 @@ function drawOpening(world: Element, x: number, y: number, vertical: boolean, le
   const seg = (A: Record<string, string | number>, h: number, off = 0, from = -h, to = h) =>
     el('line', vertical ? { ...A, x1: x + off, y1: y + from, x2: x + off, y2: y + to } : { ...A, x1: x + from, y1: y + off, x2: x + to, y2: y + off }, world);
   if (kind === 'aberto') { seg(BG, len / 2 - 1.5); return; }
-  if (kind === 'porta' || kind === 'entrada') {
-    const half = kind === 'entrada' ? 5 : 4.5, r = 2 * half, s = inward;
-    const S = { stroke: kind === 'entrada' ? 'var(--ink)' : 'var(--wood)', 'stroke-width': kind === 'entrada' ? 1.6 : 1.2, fill: 'none', 'vector-effect': 'non-scaling-stroke' };
+  if (kind === 'porta' || kind === 'entrada' || kind === 'portaExt') {
+    const half = kind === 'entrada' ? 5 : widthOf(kind, len) * 5, r = 2 * half, s = inward;
+    const S = { stroke: kind === 'porta' ? 'var(--wood)' : 'var(--ink)', 'stroke-width': kind === 'porta' ? 1.2 : 1.6, fill: 'none', 'vector-effect': 'non-scaling-stroke' };
     seg(BG, half);
     if (vertical) {
       el('line', { ...S, x1: x, y1: y - half, x2: x + r * s, y2: y - half }, world);
@@ -212,7 +212,7 @@ main.appendChild(wallMenu);
 const closeWallMenu = () => { wallMenu.hidden = true; };
 function openWallMenu(t: WallTarget, cx: number, cy: number): void {
   const w = t.shared ?? t.out!, len = w.len;
-  let title: string, list: Opening[], clear: number, auto: Opening, apply: (k: Opening | undefined) => void;
+  let title: string, list: Opening[], clear: number, auto: Opening, apply: (k: OutChoice | undefined) => void;
   if (t.shared) {
     const d = t.shared, deck = TYPES[d.a.type].kind === 'deck' || TYPES[d.b.type].kind === 'deck';
     title = `Entre ${TYPES[d.a.type].name} e ${TYPES[d.b.type].name}`;
@@ -221,7 +221,7 @@ function openWallMenu(t: WallTarget, cx: number, cy: number): void {
     setJoin(d.a, d.b, undefined);
     auto = connections(mods).find(c => c.a === d.a && c.b === d.b)?.kind ?? 'parede';
     [d.a.join, d.b.join] = saved; if (!d.a.join) delete d.a.join; if (!d.b.join) delete d.b.join;
-    apply = k => setJoin(d.a, d.b, k);
+    apply = k => setJoin(d.a, d.b, k as Opening | undefined);
   } else {
     const o = t.out!, m = o.m;
     title = `${TYPES[m.type].name}, parede exterior`;
@@ -235,11 +235,25 @@ function openWallMenu(t: WallTarget, cx: number, cy: number): void {
   const chosen = t.shared ? t.shared.chosen : t.out!.chosen;
   const btn = (label: string, on: boolean, ok: boolean, k: Opening | undefined) =>
     `<button type="button" role="menuitemradio" aria-checked="${on}" ${ok ? '' : 'disabled title="Não cabe nesta parede"'} data-k="${k ?? ''}">${label}${ok ? '' : ' <small>não cabe</small>'}</button>`;
-  wallMenu.innerHTML = `<b>${title}</b><small>${m1(len)} m de parede</small>` +
+  const items = t.out?.items ?? [], single = !t.out || items.length <= 1;
+  // outside walls: a second opening beside the first, moving it along the wall, swapping two openings
+  const more: { label: string; c: OutChoice; ok: boolean }[] = [];
+  if (t.out && items.length && items.length < MAX_PER_WALL && items[0].k !== 'aberto') for (const k of BESIDE) {
+    const c: Placed[] = [...items.map(i => ({ k: i.k })), { k }];
+    more.push({ label: `＋ ${OPENINGS[k].name} ao lado`, c, ok: fitsAll(c, len, clear) });
+  }
+  if (t.out && items.length && items[0].k !== 'aberto') {
+    const v = t.out.vertical, step = 0.3, mv = (d: number): Placed[] => items.map(i => ({ k: i.k, at: Math.round((i.at + d) * 100) / 100 }));
+    more.push({ label: `${v ? '▲' : '◀'} Mover ${m1(step * 10)} m`, c: mv(-step), ok: fitsAll(mv(-step), len, clear) });
+    more.push({ label: `${v ? '▼' : '▶'} Mover ${m1(step * 10)} m`, c: mv(step), ok: fitsAll(mv(step), len, clear) });
+    if (items.length > 1) more.push({ label: '⇄ Trocar a ordem', c: [...items].reverse().map(i => ({ k: i.k })), ok: true });
+  }
+  wallMenu.innerHTML = `<b>${title}</b><small>${m1(len)} m de parede${items.length > 1 ? ' · ' + items.map(i => OPENINGS[i.k].name).join(' + ') : ''}</small>` +
     btn(`Automático <small>(${OPENINGS[auto].name.toLowerCase()})</small>`, !chosen, true, undefined) +
-    list.map(k => btn(OPENINGS[k].name, chosen && w.kind === k, fits(k, clear), k)).join('');
+    list.map(k => btn(OPENINGS[k].name, chosen && single && w.kind === k, fits(k, clear), k)).join('') +
+    (more.length ? '<hr>' + more.map((x, i) => `<button type="button" role="menuitem" data-more="${i}" ${x.ok ? '' : 'disabled title="Não cabe nesta parede"'}>${x.label}${x.ok ? '' : ' <small>não cabe</small>'}</button>`).join('') : '');
   wallMenu.querySelectorAll<HTMLButtonElement>('button').forEach(b => {
-    b.onclick = () => { apply((b.dataset.k || undefined) as Opening | undefined); closeWallMenu(); render(); };
+    b.onclick = () => { apply(b.dataset.more ? more[+b.dataset.more].c : (b.dataset.k || undefined) as Opening | undefined); closeWallMenu(); render(); };
   });
   wallMenu.hidden = false;
   const mr = main.getBoundingClientRect(), r = wallMenu.getBoundingClientRect();
@@ -379,7 +393,7 @@ function rotate(): void {
   if (!sel) return;
   const before = fp(sel);
   sel.rot = ((sel.rot + 90) % 360) as Mod['rot'];
-  if (sel.out) { const o: Mod['out'] = {}; for (const [k, v] of Object.entries(sel.out)) o[TURN[k as keyof typeof TURN]] = v; sel.out = o; }
+  if (sel.out) { const o: Mod['out'] = {}; for (const [k, v] of Object.entries(sel.out)) o[TURN[k as keyof typeof TURN]] = turnChoice(v, k as keyof typeof TURN); sel.out = o; }
   const after = fp(sel);
   sel.x = snap(before.x + before.w / 2 - after.w / 2); sel.y = snap(before.y + before.h / 2 - after.h / 2);
   render();
@@ -393,7 +407,7 @@ function moveLevel(d: number): void {
   render();
 }
 function del(): void { if (!sel) return; const gone = sel; mods = mods.filter(x => x !== gone); sel = null; render(); }
-function dup(): void { if (!sel) return; const f = fp(sel); const m: Mod = { ...sel, id: nextId++, x: f.x + f.w }; delete m.join; delete m.flip; if (sel.out) m.out = { ...sel.out }; mods.push(m); sel = m; render(); }
+function dup(): void { if (!sel) return; const f = fp(sel); const m: Mod = { ...sel, id: nextId++, x: f.x + f.w }; delete m.join; delete m.flip; if (sel.out) m.out = structuredClone(sel.out); mods.push(m); sel = m; render(); }
 $('bUp').onclick = () => moveLevel(1);
 $('bDown').onclick = () => moveLevel(-1);
 /** Where an identical module can go on the floor above, or why not. */
@@ -406,7 +420,7 @@ function stackSpot(m: Mod): string | null {
 }
 function stack(): void {
   if (!sel || stackSpot(sel)) return;
-  const m: Mod = { ...sel, id: nextId++, z: lv(sel) + 1 }; delete m.join; delete m.flip; if (sel.out) m.out = { ...sel.out };
+  const m: Mod = { ...sel, id: nextId++, z: lv(sel) + 1 }; delete m.join; delete m.flip; if (sel.out) m.out = structuredClone(sel.out);
   mods.push(m); sel = m; if (!is3D) curLevel = lv(m); render();
 }
 $('bRot').onclick = rotate; $('bDel').onclick = del; $('bDup').onclick = dup; $('bStack').onclick = stack;

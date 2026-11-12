@@ -154,6 +154,7 @@ kbd{font:500 10.5px var(--f-mono);border:1px solid var(--grid-major);border-bott
 .wallmenu button[aria-checked="true"]{background:rgba(227,178,119,.14)}
 .wallmenu button[aria-checked="true"]::before{content:"✓";position:absolute;left:9px;color:var(--wood)}
 .wallmenu button:disabled{opacity:.45;cursor:not-allowed}
+.wallmenu hr{border:0;border-top:1px solid var(--grid-major);margin:4px 2px;width:auto}
 /* "Fotografia realista" */
 .photobusy{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:20;display:flex;flex-direction:column;gap:10px;align-items:stretch;width:min(320px,calc(100% - 32px));padding:16px;background:var(--panel);border:1px solid var(--grid-major);border-radius:4px;box-shadow:0 8px 24px rgba(0,0,0,.35);font:13px var(--f-ui);color:var(--ink);text-align:center}
 .photobusy i{display:block;height:6px;background:var(--paper);border-radius:3px;overflow:hidden}
