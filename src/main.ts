@@ -565,7 +565,7 @@ async function makePhoto(): Promise<void> {
     onProgress: p => { msg.textContent = `A criar a fotografia realista… ${Math.round(p * 100)} %`; bar.style.width = `${p * 100}%`; },
   });
   busy.hidden = true; $('view3d').style.pointerEvents = '';
-  if (!url) { alert('Não foi possível criar a fotografia neste navegador.'); return; }
+  if (!url) { alert('Não foi possível criar a fotografia neste computador: a placa gráfica não conseguiu calcular a imagem. Recarregue a página e tente outra vez; se voltar a falhar, experimente o Chrome ou outro computador.'); return; }
   lastPhoto = { url, key: photoKey() };
   showPhoto(url);
 }
