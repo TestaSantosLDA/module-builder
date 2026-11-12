@@ -1,0 +1,22 @@
+{
+  "_doc": "Every texture, sky and model the site ships. scripts/fetch_polyhaven.py downloads the 'polyhaven' entries (run on the PC, the cloud cannot reach Poly Haven) and rewrites CREDITOS.md; scripts/compress-assets.mjs turns each 'out' into KTX2 / meshopt files in public/. encode: color = ETC1S sRGB, data = ETC1S linear (AO/roughness/metal), normal = UASTC + zstd (normalSize: smaller normal maps), copy = as is.",
+  "license_rule": "Only CC0 or own work goes to the browser (see the realism plan, track 2).",
+  "items": [
+    { "out": "kit/fachada/madeira", "polyhaven": "japanese_cedar_planks", "name": "Japanese Cedar Planks", "license": "CC0", "res": "1k", "normalSize": 512,
+      "maps": { "cor": ["Diffuse", "color"], "nor": ["nor_gl", "normal"], "arm": ["arm", "data"] } },
+    { "out": "kit/fachada/branco", "polyhaven": "white_planks_clean", "name": "White Planks Clean", "license": "CC0", "res": "1k", "normalSize": 512,
+      "maps": { "cor": ["Diffuse", "color"], "nor": ["nor_gl", "normal"], "arm": ["arm", "data"] } },
+    { "out": "kit/fachada/grafite", "polyhaven": "black_painted_planks", "name": "Black Painted Planks", "license": "CC0", "res": "1k", "normalSize": 512,
+      "maps": { "cor": ["Diffuse", "color"], "nor": ["nor_gl", "normal"], "arm": ["arm", "data"] } },
+    { "out": "kit/relva/relva", "polyhaven": "sparse_grass", "name": "Sparse Grass", "license": "CC0", "res": "2k", "size": 1024, "normalSize": 512,
+      "maps": { "nor": ["nor_gl", "normal"], "arm": ["ao+rough", "data"] } },
+    { "out": "kit/relva/campo", "polyhaven": "aerial_grass_rock", "name": "Aerial Grass Rock", "license": "CC0", "res": "2k", "size": 1024,
+      "maps": { "cor": ["Diffuse", "color"] } },
+    { "out": "kit/ceu/ceu", "polyhaven": "kloofendal_48d_partly_cloudy_puresky", "name": "Kloofendal 48d Partly Cloudy (Pure Sky)", "license": "CC0", "res": "4k",
+      "hdri": true, "files": { "env.hdr": "copy", "fundo.jpg": "copy", ".json": "copy" },
+      "prep": "python scripts/prep_hdri.py <download>_4k.hdr assets/kit/ceu --env 512 --sun-azimuth 101.5" },
+    { "out": "kit/deck", "own": "blender/bake.py", "license": "própria (Testa Santos)",
+      "maps": { "cor": ["deck_cor.jpg", "color"], "normal": ["deck_normal.png", "normal"], "ao": ["deck_ao.jpg", "data"] } },
+    { "out": "kit/kit.glb", "own": "blender/kit.py", "license": "própria (Testa Santos)", "model": "meshopt" }
+  ]
+}

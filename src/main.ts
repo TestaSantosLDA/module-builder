@@ -7,7 +7,7 @@ import { CHOICES, fits, OPENINGS, TURN, widthOf, type Opening } from './model/op
 import { History } from './model/history';
 import { DEFAULT_HOUSE, FAMILIES, HOUSES, houseById, placeHouse } from './model/houses';
 import { parsePlan } from './model/plan';
-import { createView3D, type View3D } from './ui/view3d';
+import type { View3D } from './ui/view3d'; // the 3D code (three.js) is loaded only when the 3D tab is opened
 import { interior } from './ui/sketch';
 import { setupQuote } from './ui/quote';
 
@@ -448,10 +448,13 @@ $('example').onclick = loadRiga;
 $('clear').onclick = () => { mods = []; sel = null; render(); };
 
 // ---------- 3D ----------
-function ensure3D(): View3D | null {
-  if (!view3d) {
+let loading3D: Promise<View3D | null> | null = null;
+const disable3D = () => { const t = $<HTMLButtonElement>('tab3d'); t.disabled = true; t.title = 'Não foi possível abrir o 3D neste navegador'; };
+function ensure3D(): Promise<View3D | null> {
+  return loading3D ??= import('./ui/view3d').then(({ createView3D }) => {
     view3d = createView3D($('view3d'), {
       kitUrl: import.meta.env.BASE_URL + 'kit/',
+      basisUrl: import.meta.env.BASE_URL + 'basis/',
       getMods: () => mods,
       select: m => { sel = m; },
       changed: render,
@@ -467,13 +470,13 @@ function ensure3D(): View3D | null {
       },
     });
     $('view3d').addEventListener('pointerdown', closeWallMenu, true);
-    if (!view3d) { const t = $<HTMLButtonElement>('tab3d'); t.disabled = true; t.title = 'Não foi possível abrir o 3D neste navegador'; return null; }
+    if (!view3d) { disable3D(); return null; }
     view3d.setFinish(finish);
-  }
-  return view3d;
+    return view3d;
+  }).catch(err => { console.warn('3D não carregou', err); loading3D = null; disable3D(); return null; });
 }
-function setView(three: boolean): void {
-  if (three && !ensure3D()) return;
+async function setView(three: boolean): Promise<void> {
+  if (three) { $('tab3d').setAttribute('aria-busy', 'true'); const ok = await ensure3D(); $('tab3d').removeAttribute('aria-busy'); if (!ok) return; }
   is3D = three; closeWallMenu();
   $('tab2d').setAttribute('aria-pressed', String(!three)); $('tab3d').setAttribute('aria-pressed', String(three));
   (svg as unknown as HTMLElement).hidden = three; $('view3d').hidden = !three;
@@ -482,8 +485,8 @@ function setView(three: boolean): void {
   if (three && view3d) { view3d.resize(); view3d.frame(mods); view3d.start(); render(); }
   else { view3d?.stop(); if (sel) curLevel = lv(sel); render(); }
 }
-$('tab2d').onclick = () => setView(false);
-$('tab3d').onclick = () => setView(true);
+$('tab2d').onclick = () => void setView(false);
+$('tab3d').onclick = () => void setView(true);
 window.addEventListener('resize', () => { view3d?.resize(); render(); });
 
 const FINISHES = ['branco', 'madeira', 'grafite'] as const;
@@ -506,7 +509,7 @@ setupQuote({
   getMods: () => mods,
   finish: () => finish,
   house: () => houseId,
-  capture: () => ensure3D()?.capture(mods, problems(mods).bad, connections(mods)) ?? null,
+  capture: async () => (await ensure3D())?.capture(mods, problems(mods).bad, connections(mods)) ?? null,
 });
 
 // ---------- undo + persistence ----------

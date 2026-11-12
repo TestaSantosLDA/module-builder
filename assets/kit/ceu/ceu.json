@@ -1,0 +1,25 @@
+{
+ "bgScale": 15.1003,
+ "horizon": [
+  0.442,
+  0.4793,
+  0.588
+ ],
+ "sunIrradiance": 4.445,
+ "groundRadiance": [
+  0.0897,
+  0.1228,
+  0.0961
+ ],
+ "sun": [
+  -0.1337,
+  0.7417,
+  0.6573
+ ],
+ "sunElevationDeg": 47.9,
+ "envSize": [
+  512,
+  256
+ ],
+ "source": "kloofendal_48d_partly_cloudy_puresky_4k.hdr"
+}
