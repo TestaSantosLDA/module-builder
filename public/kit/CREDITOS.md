@@ -24,3 +24,20 @@ Gerado por `scripts/compress-assets.mjs` a partir de `assets/assets.json`.
 | `public/kit/arvores/tree_small_02*` | [Tree Small 02 (dados do impostor)](https://polyhaven.com/a/tree_small_02) (Poly Haven) | CC0 |
 | `public/kit/deck*` | `blender/bake.py` | própria (Testa Santos) |
 | `public/kit/kit.glb*` | `blender/kit.py` | própria (Testa Santos) |
+| `public/kit/mobilia/tex/boucle*` | `jular-treehouses (tratada a partir de Poly Haven wool_boucle)` | CC0 |
+| `public/kit/mobilia/tex/ceramica*` | `jular-treehouses (tratada a partir de Poly Haven plaster_grey_04)` | CC0 |
+| `public/kit/mobilia/tex/granito*` | `jular-treehouses tools/make_textures.py (procedimental)` | própria (Testa Santos) |
+| `public/kit/mobilia/tex/juta*` | `jular-treehouses tools/make_textures.py (procedimental)` | própria (Testa Santos) |
+| `public/kit/mobilia/tex/madeira_clara*` | `jular-treehouses (tratada a partir de Poly Haven oak_veneer_01)` | CC0 |
+| `public/kit/mobilia/tex/madeira_escura*` | `jular-treehouses (tratada a partir de Poly Haven black_walnut_veneer_01)` | CC0 |
+| `public/kit/mobilia/tex/palhinha*` | `jular-treehouses tools/make_textures.py (procedimental)` | própria (Testa Santos) |
+| `public/kit/mobilia/tex/reboco*` | `jular-treehouses (tratada a partir de Poly Haven white_plaster_02)` | CC0 |
+| `public/kit/mobilia/tex/tecido*` | `jular-treehouses (tratada a partir de Poly Haven rough_linen)` | CC0 |
+| `public/kit/mobilia/mob_sala.glb*` | `jular-treehouses blender/kit_web.py` | própria (Testa Santos) |
+| `public/kit/mobilia/mob_cozinha.glb*` | `jular-treehouses blender/kit_web.py` | própria (Testa Santos) |
+| `public/kit/mobilia/mob_entrada.glb*` | `jular-treehouses blender/kit_web.py` | própria (Testa Santos) |
+| `public/kit/mobilia/mob_quarto.glb*` | `jular-treehouses blender/kit_web.py` | própria (Testa Santos) |
+| `public/kit/mobilia/mob_suite.glb*` | `jular-treehouses blender/kit_web.py` | própria (Testa Santos) |
+| `public/kit/mobilia/mob_escada.glb*` | `jular-treehouses blender/kit_web.py` | própria (Testa Santos) |
+| `public/kit/mobilia/porta_interior.glb*` | `jular-treehouses blender/kit_web.py` | própria (Testa Santos) |
+| `public/kit/mobilia/materiais*` | `jular-treehouses blender/kit_web.py` | própria (Testa Santos) |

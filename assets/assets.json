@@ -323,6 +323,213 @@
       "own": "blender/kit.py",
       "license": "própria (Testa Santos)",
       "model": "meshopt"
+    },
+    {
+      "out": "kit/mobilia/tex/boucle",
+      "own": "jular-treehouses (tratada a partir de Poly Haven wool_boucle)",
+      "license": "CC0",
+      "size": 512,
+      "normalSize": 512,
+      "maps": {
+        "arm": [
+          "boucle_arm.jpg",
+          "data"
+        ],
+        "nor": [
+          "boucle_nor.jpg",
+          "normal"
+        ]
+      }
+    },
+    {
+      "out": "kit/mobilia/tex/ceramica",
+      "own": "jular-treehouses (tratada a partir de Poly Haven plaster_grey_04)",
+      "license": "CC0",
+      "size": 512,
+      "normalSize": 512,
+      "maps": {
+        "arm": [
+          "ceramica_arm.jpg",
+          "data"
+        ],
+        "cor": [
+          "ceramica_cor.jpg",
+          "color"
+        ],
+        "nor": [
+          "ceramica_nor.jpg",
+          "normal"
+        ]
+      }
+    },
+    {
+      "out": "kit/mobilia/tex/granito",
+      "own": "jular-treehouses tools/make_textures.py (procedimental)",
+      "license": "própria (Testa Santos)",
+      "size": 512,
+      "normalSize": 512,
+      "maps": {
+        "cor": [
+          "granito_cor.jpg",
+          "color"
+        ]
+      }
+    },
+    {
+      "out": "kit/mobilia/tex/juta",
+      "own": "jular-treehouses tools/make_textures.py (procedimental)",
+      "license": "própria (Testa Santos)",
+      "size": 512,
+      "normalSize": 512,
+      "maps": {
+        "cor": [
+          "juta_cor.jpg",
+          "color"
+        ]
+      }
+    },
+    {
+      "out": "kit/mobilia/tex/madeira_clara",
+      "own": "jular-treehouses (tratada a partir de Poly Haven oak_veneer_01)",
+      "license": "CC0",
+      "size": 512,
+      "normalSize": 512,
+      "maps": {
+        "arm": [
+          "madeira_clara_arm.jpg",
+          "data"
+        ],
+        "cor": [
+          "madeira_clara_cor.jpg",
+          "color"
+        ],
+        "nor": [
+          "madeira_clara_nor.jpg",
+          "normal"
+        ]
+      }
+    },
+    {
+      "out": "kit/mobilia/tex/madeira_escura",
+      "own": "jular-treehouses (tratada a partir de Poly Haven black_walnut_veneer_01)",
+      "license": "CC0",
+      "size": 512,
+      "normalSize": 512,
+      "maps": {
+        "arm": [
+          "madeira_escura_arm.jpg",
+          "data"
+        ],
+        "cor": [
+          "madeira_escura_cor.jpg",
+          "color"
+        ],
+        "nor": [
+          "madeira_escura_nor.jpg",
+          "normal"
+        ]
+      }
+    },
+    {
+      "out": "kit/mobilia/tex/palhinha",
+      "own": "jular-treehouses tools/make_textures.py (procedimental)",
+      "license": "própria (Testa Santos)",
+      "size": 512,
+      "normalSize": 512,
+      "maps": {
+        "cor": [
+          "palhinha_cor.jpg",
+          "color"
+        ]
+      }
+    },
+    {
+      "out": "kit/mobilia/tex/reboco",
+      "own": "jular-treehouses (tratada a partir de Poly Haven white_plaster_02)",
+      "license": "CC0",
+      "size": 512,
+      "normalSize": 512,
+      "maps": {
+        "arm": [
+          "reboco_arm.jpg",
+          "data"
+        ],
+        "nor": [
+          "reboco_nor.jpg",
+          "normal"
+        ]
+      }
+    },
+    {
+      "out": "kit/mobilia/tex/tecido",
+      "own": "jular-treehouses (tratada a partir de Poly Haven rough_linen)",
+      "license": "CC0",
+      "size": 512,
+      "normalSize": 512,
+      "maps": {
+        "arm": [
+          "tecido_arm.jpg",
+          "data"
+        ],
+        "cor": [
+          "tecido_cor.jpg",
+          "color"
+        ],
+        "nor": [
+          "tecido_nor.jpg",
+          "normal"
+        ]
+      }
+    },
+    {
+      "out": "kit/mobilia/mob_sala.glb",
+      "own": "jular-treehouses blender/kit_web.py",
+      "license": "própria (Testa Santos)",
+      "model": "meshopt"
+    },
+    {
+      "out": "kit/mobilia/mob_cozinha.glb",
+      "own": "jular-treehouses blender/kit_web.py",
+      "license": "própria (Testa Santos)",
+      "model": "meshopt"
+    },
+    {
+      "out": "kit/mobilia/mob_entrada.glb",
+      "own": "jular-treehouses blender/kit_web.py",
+      "license": "própria (Testa Santos)",
+      "model": "meshopt"
+    },
+    {
+      "out": "kit/mobilia/mob_quarto.glb",
+      "own": "jular-treehouses blender/kit_web.py",
+      "license": "própria (Testa Santos)",
+      "model": "meshopt"
+    },
+    {
+      "out": "kit/mobilia/mob_suite.glb",
+      "own": "jular-treehouses blender/kit_web.py",
+      "license": "própria (Testa Santos)",
+      "model": "meshopt"
+    },
+    {
+      "out": "kit/mobilia/mob_escada.glb",
+      "own": "jular-treehouses blender/kit_web.py",
+      "license": "própria (Testa Santos)",
+      "model": "meshopt"
+    },
+    {
+      "out": "kit/mobilia/porta_interior.glb",
+      "own": "jular-treehouses blender/kit_web.py",
+      "license": "própria (Testa Santos)",
+      "model": "meshopt"
+    },
+    {
+      "out": "kit/mobilia/materiais",
+      "own": "jular-treehouses blender/kit_web.py",
+      "license": "própria (Testa Santos)",
+      "files": {
+        ".json": "copy"
+      }
     }
   ]
 }
