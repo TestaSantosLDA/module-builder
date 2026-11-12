@@ -27,9 +27,12 @@ export const DEFAULT_HOUSE = 'riga-t2';
 export const houseById = (id: string | null | undefined) => HOUSES.find(h => h.id === id);
 
 export function placeHouse(h: House, nextId: () => number): Mod[] {
-  const mods: Mod[] = h.plan.map(({ flip: _f, ...p }) => ({ ...p, id: nextId() }));
-  // in the house data, flips name the other module by its index in the plan
-  h.plan.forEach((p, i) => { if (p.flip?.length) mods[i].flip = p.flip.map(j => mods[j].id); });
+  const mods: Mod[] = h.plan.map(({ flip: _f, join: _j, out, ...p }) => ({ ...p, ...(out ? { out: { ...out } } : {}), id: nextId() }));
+  // in the house data, flips and joins name the other module by its index in the plan
+  h.plan.forEach((p, i) => {
+    if (p.flip?.length) mods[i].flip = p.flip.map(j => mods[j].id);
+    if (p.join) mods[i].join = Object.fromEntries(Object.entries(p.join).map(([j, o]) => [mods[+j].id, o]));
+  });
   return mods;
 }
 
