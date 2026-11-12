@@ -86,12 +86,13 @@ kbd{font:500 10.5px var(--f-mono);border:1px solid var(--grid-major);border-bott
 .row .btn{flex:1;font-size:12px;padding:6px}
 
 /* selection toolbar */
-.selbar{position:absolute;display:flex;gap:4px;padding:4px;transform:translate(-50%,-100%)}
+.selbar{position:absolute;z-index:6;display:flex;gap:4px;padding:4px;transform:translate(-50%,-100%)}
 .selbar button{font:500 12px var(--f-ui);background:var(--paper);color:var(--ink);border:1px solid var(--grid-major);border-radius:3px;padding:5px 8px;cursor:pointer}
-.selbar button:hover{border-color:var(--wood)}
+.selbar button:hover:not(:disabled){border-color:var(--wood)}
+.selbar button:disabled{opacity:.4;cursor:not-allowed}
 
 .zoom{position:absolute;right:max(14px,env(safe-area-inset-right,0px));top:14px;display:flex;flex-direction:column}
-.undo{position:absolute;right:max(14px,env(safe-area-inset-right,0px));top:96px;display:flex;align-items:center;gap:6px;height:34px;padding:0 10px;font:500 12px var(--f-mono);letter-spacing:.04em;background:var(--panel);color:var(--ink);border:1px solid var(--grid-major);cursor:pointer}
+.undo{position:absolute;z-index:7;right:max(14px,env(safe-area-inset-right,0px));top:96px;display:flex;align-items:center;gap:6px;height:34px;padding:0 10px;font:500 12px var(--f-mono);letter-spacing:.04em;background:var(--panel);color:var(--ink);border:1px solid var(--grid-major);cursor:pointer}
 .undo:disabled{opacity:.4;cursor:default}
 .undo b{font-weight:700}
 .zoom button{width:34px;height:34px;font:500 16px var(--f-mono);background:var(--panel);color:var(--ink);border:1px solid var(--grid-major);cursor:pointer}
@@ -120,7 +121,7 @@ kbd{font:500 10.5px var(--f-mono);border:1px solid var(--grid-major);border-bott
 
 @media (max-width:640px){
   .palette{left:8px;right:8px;width:auto;top:8px;max-height:calc(100% - var(--sum-h,190px) - 24px - env(safe-area-inset-bottom,0px));padding:8px;z-index:5}
-  .finish{left:8px;top:58px;transform:none;padding:3px 4px}.finish small{display:none}
+  .finish{left:8px;top:58px;transform:none;padding:3px 4px}.undo{top:58px;right:8px;height:32px}.finish small{display:none}
   .mods{grid-template-columns:repeat(3,minmax(0,1fr));gap:4px}
   .mod{padding:5px 4px}.mod svg{display:none}.mod span{display:none}.mod b{font-size:11px}
   .fam,.hint{display:none}

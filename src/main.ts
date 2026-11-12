@@ -2,7 +2,7 @@
 // Pure rules live in src/model (tested); this file is the browser UI.
 import './style.css';
 import { CATEGORIES, MAX_LEVEL, TYPES, type Mod, type TypeId } from './model/catalog';
-import { connections, footprint as fp, level as lv, outWalls, problems, setJoin, setOut, snapToNeighbours, summarize, type Door, type OutWall } from './model/geometry';
+import { connections, footprint as fp, kindOf, level as lv, outWalls, overlaps, problems, setJoin, setOut, snapToNeighbours, summarize, type Door, type OutWall } from './model/geometry';
 import { CHOICES, fits, OPENINGS, TURN, widthOf, type Opening } from './model/openings';
 import { History } from './model/history';
 import { DEFAULT_HOUSE, FAMILIES, HOUSES, houseById, placeHouse } from './model/houses';
@@ -252,8 +252,12 @@ function placeSelbar(): void {
   const f = fp(sel), mr = main.getBoundingClientRect();
   const p = is3D && view3d ? view3d.screenOf(sel, mr) : toScreen(f.x + f.w / 2, f.y);
   bar.hidden = false;
-  bar.style.left = Math.min(Math.max(p.x, 110), mr.width - 110) + 'px';
-  bar.style.top = Math.max(p.y - 10, 60) + 'px';
+  const why = stackSpot(sel), bs = $<HTMLButtonElement>('bStack');
+  bs.disabled = !!why; bs.title = why ?? 'Pôr um módulo igual no piso de cima';
+  const half = bar.offsetWidth / 2 + 8;
+  bar.style.left = Math.min(Math.max(p.x, half), mr.width - half) + 'px';
+  const fin = $('finish'), topMin = (fin.hidden ? 0 : fin.offsetTop + fin.offsetHeight) + bar.offsetHeight + 8; // stay below the facade bar
+  bar.style.top = Math.max(p.y - 10, 60, topMin) + 'px';
 }
 
 // ---------- 2D interactions ----------
@@ -390,7 +394,20 @@ function del(): void { if (!sel) return; const gone = sel; mods = mods.filter(x 
 function dup(): void { if (!sel) return; const f = fp(sel); const m: Mod = { ...sel, id: nextId++, x: f.x + f.w }; delete m.join; delete m.flip; if (sel.out) m.out = { ...sel.out }; mods.push(m); sel = m; render(); }
 $('bUp').onclick = () => moveLevel(1);
 $('bDown').onclick = () => moveLevel(-1);
-$('bRot').onclick = rotate; $('bDel').onclick = del; $('bDup').onclick = dup;
+/** Where an identical module can go on the floor above, or why not. */
+function stackSpot(m: Mod): string | null {
+  if (lv(m) >= MAX_LEVEL) return 'Já está no último piso';
+  if (kindOf(m) === 'deck') return 'Um deck não aguenta um módulo por cima';
+  const f = fp(m);
+  if (mods.some(o => lv(o) === lv(m) + 1 && overlaps(fp(o), f))) return 'Já há um módulo por cima';
+  return null;
+}
+function stack(): void {
+  if (!sel || stackSpot(sel)) return;
+  const m: Mod = { ...sel, id: nextId++, z: lv(sel) + 1 }; delete m.join; delete m.flip; if (sel.out) m.out = { ...sel.out };
+  mods.push(m); sel = m; if (!is3D) curLevel = lv(m); render();
+}
+$('bRot').onclick = rotate; $('bDel').onclick = del; $('bDup').onclick = dup; $('bStack').onclick = stack;
 for (const b of document.querySelectorAll<HTMLButtonElement>('#floors button'))
   b.onclick = () => { curLevel = Number(b.dataset.l); if (sel && lv(sel) !== curLevel) sel = null; render(); };
 
