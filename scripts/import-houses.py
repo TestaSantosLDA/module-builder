@@ -3,6 +3,7 @@
 
 Usage: python3 scripts/import-houses.py <folder with *.json>
 A reviewed version in <folder>/verificacao/<id>.corrigido.json (checked against the catalogue) wins over <id>.json.
+<folder>/verificacao/<id>.vaos.json adds outside openings (out) and joins per plan index, from the Blender assembler review.
 Each JSON: {id, family, name, page, catalogArea, modules:[{type,x,y,rot,z}], newTypes:{key:{name,w,h,kind}}, notes}
 Re-run it when Jular sends real dimensions and the JSON files are updated.
 """
@@ -59,6 +60,16 @@ for hid in ids:
         for i, j in json.loads(pf.read_text())['flip']:
             if not (0 <= i < len(plan) and 0 <= j < len(plan)): sys.exit(f'{pf}: bad index pair {i},{j}')
             plan[i].setdefault('flip', []).append(j)
+    # outside openings and joins checked against the catalogue (Blender assembler review): by plan index
+    vf = src / 'verificacao' / f'{hid}.vaos.json'
+    if vf.exists():
+        v = json.loads(vf.read_text())
+        for i, o in v.get('out', {}).items():
+            if not 0 <= int(i) < len(plan) or set(o) - {'N', 'S', 'W', 'E'}: sys.exit(f'{vf}: bad out {i} {o}')
+            plan[int(i)]['out'] = o
+        for i, j in v.get('join', {}).items():
+            if not 0 <= int(i) < len(plan) or any(not 0 <= int(k) < len(plan) for k in j): sys.exit(f'{vf}: bad join {i} {j}')
+            plan[int(i)]['join'] = {int(k): o for k, o in j.items()}
     houses.append({'id': hid, 'family': d['family'], 'label': label, 'name': d['name'], 'page': d['page'], 'catalogArea': area, 'plan': plan})
 
 def js(v): return json.dumps(v, ensure_ascii=False)
