@@ -56,7 +56,13 @@ export interface View3D {
   setFinish(f: Finish): void;
   /** renders a 960×600 JPEG of the house for the quote request */
   capture(mods: Mod[], bad: Set<Mod>, ds: Door[]): string | null;
+  /** true once the sky has loaded and a realistic photo can be made */
+  canPhoto(): boolean;
+  /** "Fotografia realista": the current view, path traced; a JPEG data URL (null if not available) */
+  photo(mods: Mod[], ds: Door[], o: PhotoRequest): Promise<string | null>;
 }
+
+export interface PhotoRequest { width: number; height: number; samples: number; maxMs: number; onProgress?(p: number): void; stop?: { now: boolean } }
 
 const WH = STOREY / 10; // storey height, m
 const BASE = 0.3; // modules sit on footings 30 cm above the ground
@@ -70,7 +76,7 @@ const GLOW: Record<string, [number, number]> = { sala: [0xffcf98, 0.9], quarto: 
 
 const noRay = <O extends THREE.Object3D>(o: O): O => { o.traverse(n => { n.raycast = () => {}; }); return o; };
 function boxAt(w: number, h: number, d: number, mat: THREE.Material, x: number, y: number, z: number, parent: THREE.Object3D, round = 0): THREE.Mesh {
-  const g = round > 0 ? meterUV(new RoundedBoxGeometry(w, h, d, 2, Math.min(round, w / 3, h / 3, d / 3))) : new THREE.BoxGeometry(w, h, d);
+  const g = meterUV(round > 0 ? new RoundedBoxGeometry(w, h, d, 2, Math.min(round, w / 3, h / 3, d / 3)) : new THREE.BoxGeometry(w, h, d));
   const m = new THREE.Mesh(g, mat); m.position.set(x, y, z); parent.add(m); return m;
 }
 function placeAt<O extends THREE.Object3D>(obj: O, cx: number, y: number, cz: number, nx: number, nz: number, off: number): O {
@@ -141,6 +147,7 @@ export function createView3D(box: HTMLElement, host: View3DHost): View3D | null 
   }, undefined, fail));
 
   // ---------- sky, sky light and ground ----------
+  let envHdr: THREE.Texture | null = null;
   const grid = new THREE.Group();
   for (const [n, c1, c2, y] of [[200, 0x5f86ad, 0x2a5580, 0.005], [40, 0x8fb3d6, 0x8fb3d6, 0.01]] as const) {
     const g = new THREE.GridHelper(200, n, c1, c2); g.position.y = y; (g.material as THREE.Material).transparent = true; (g.material as THREE.Material).opacity = fx.sky ? 0.22 : 0.35; grid.add(g);
@@ -170,7 +177,7 @@ export function createView3D(box: HTMLElement, host: View3DHost): View3D | null 
       });
       new RGBELoader().load(host.kitUrl + 'ceu/ceu_env.hdr', t => {
         const pm = new THREE.PMREMGenerator(renderer);
-        scene.environment = pm.fromEquirectangular(t).texture; pm.dispose(); t.dispose(); host.changed();
+        scene.environment = pm.fromEquirectangular(t).texture; pm.dispose(); envHdr = t; host.changed(); // the path tracer needs the equirect
       });
       host.changed();
     }).catch(e => console.warn('Céu não carregou', e));
@@ -232,6 +239,18 @@ export function createView3D(box: HTMLElement, host: View3DHost): View3D | null 
     facade(f).then(p => { if (finishWanted !== f) return; Object.assign(M.clad, p); M.clad.needsUpdate = true; host.changed(); }).catch(e => console.warn('Fachada não carregou', e));
   };
   applyFinish('branco');
+  // flat surfaces with real material scans (Poly Haven, CC0): roof membrane, floor, footings, pergola timber.
+  // [material, metres per texture tile, colour multiplier keeping the old average colour]
+  if (fx.on) {
+    const SURF: [string, THREE.MeshStandardMaterial, number, number][] = [
+      ['cobertura', M.roof, 3, 0xaebccf], ['piso', M.floor, 1.6, 0xffffff], ['plinto', M.plinth, 2.5, 0xf2f2f2], ['pergola', M.timber, 1.5, 0xffd1a8]];
+    for (const [k, mat, size, tint] of SURF) {
+      const r = 1 / size;
+      void Promise.all([ktxTex(`superficies/${k}_cor.ktx2`, true, r, r), ktxTex(`superficies/${k}_nor.ktx2`, false, r, r), ktxTex(`superficies/${k}_arm.ktx2`, false, r, r)]).then(([c, n, arm]) => {
+        Object.assign(mat, { map: c, normalMap: n, roughnessMap: arm, aoMap: arm, roughness: 1, color: new THREE.Color(tint) }); mat.needsUpdate = true; host.changed();
+      }).catch(e => console.warn(`Textura ${k} não carregou`, e));
+    }
+  }
   void Promise.all([ktxTex('deck_cor.ktx2', true, 1, 1), ktxTex('deck_normal.ktx2', false, 1, 1), ktxTex('deck_ao.ktx2', false, 1, 1)]).then(([c, n, ao]) => {
     Object.assign(M.deck, { map: c, normalMap: n, aoMap: ao, color: new THREE.Color(0xffffff) }); M.deck.needsUpdate = true; host.changed();
   }).catch(e => console.warn('Deck não carregou', e));
@@ -286,7 +305,7 @@ export function createView3D(box: HTMLElement, host: View3DHost): View3D | null 
   }
   /** horizontal plane with in-module AO towards its four edges (floor, ceiling) */
   function roomPlane(w: number, d: number, mat: THREE.Material, h: number): THREE.Mesh {
-    const g = new THREE.PlaneGeometry(w, d, 12, 12);
+    const g = meterUV(new THREE.PlaneGeometry(w, d, 12, 12));
     setAO(g, (x, y) => [h, Math.min(x + w / 2, w / 2 - x), Math.min(y + d / 2, d / 2 - y), 0]);
     return new THREE.Mesh(g, mat);
   }
@@ -383,7 +402,7 @@ export function createView3D(box: HTMLElement, host: View3DHost): View3D | null 
       for (let i = 0; i < a.count; i++) a.setXY(i, uv[0] + a.getX(i) * (uv[2] - uv[0]), uv[1] + a.getY(i) * (uv[3] - uv[1]));
       const mat = new THREE.MeshBasicMaterial({ color: 0x000000, alphaMap: tex, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 });
       const p = new THREE.Mesh(geo, mat); p.rotation.x = -Math.PI / 2; p.position.set((x0 + x1) / 2, y, (z0 + z1) / 2); p.renderOrder = 1;
-      contactMats.push(mat); grp.add(noRay(p));
+      contactMats.push(mat); p.userData.rasterOnly = true; grp.add(noRay(p));
     };
     for (let L = 0; L <= MAX_LEVEL; L++) {
       const here = mods.filter(m => lv(m) === L); if (!here.length) continue;
@@ -402,6 +421,55 @@ export function createView3D(box: HTMLElement, host: View3DHost): View3D | null 
     }
   }
 
+  // ---------- trees (desktop tier): impostors of Poly Haven trees (CC0) rendered in Cycles, 8 azimuths x 2 elevations ----------
+  interface Impostor { cols: number; azimuths: number; elevations_deg: number[]; size_m: number; center_m: number }
+  const TREES = ['island_tree_01', 'island_tree_02', 'tree_small_02', 'jacaranda_tree'];
+  const trees: { mesh: THREE.Mesh; info: Impostor; yaw: number }[] = [];
+  const treeGrp = new THREE.Group(); scene.add(treeGrp);
+  let treeKinds: { mat: THREE.MeshStandardMaterial; info: Impostor }[] | null = null, treeCentre: THREE.Vector3 | null = null, treeR = 0;
+  if (fx.trees) {
+    void Promise.all(TREES.map(id => Promise.all([fetch(host.kitUrl + `arvores/${id}.json`).then(r => r.json() as Promise<Impostor>), ktxTex(`arvores/${id}_cor.ktx2`, true, 1, 1)])
+      .then(([info, map]) => {
+        map.wrapS = map.wrapT = THREE.ClampToEdgeWrapping; map.repeat.set(1, 1); map.anisotropy = 1;
+        const mat = new THREE.MeshStandardMaterial({ map, alphaTest: 0.5, roughness: 1, side: THREE.DoubleSide, envMapIntensity: 0.8 });
+        Object.assign(mat, { castShadow: false }); // read by the path tracer: a card turned to the camera would cast a sliver
+        return { info, mat };
+      }))).then(k => { treeKinds = k; placeTrees(); }).catch(e => console.warn('Árvores não carregaram', e));
+  }
+  /** a loose ring of trees around the house, re-planted only when the house grows into it */
+  function placeTrees(): void {
+    if (!treeKinds || !treeCentre) return;
+    for (const o of treeGrp.children) (o as THREE.Mesh).geometry.dispose();
+    trees.length = 0; treeGrp.clear();
+    let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    // [angle around the house, distance factor, kind]: more of them behind the house, as seen from the default camera
+    const spots: [number, number, number][] = [[0.2, 0.6, 0], [0.9, 1.4, 2], [1.6, 0.3, 1], [2.2, 0.9, 0], [2.7, 0.2, 2], [3.2, 1.2, 1], [3.6, 0.5, 0], [4.1, 0.1, 1], [4.6, 0.8, 2], [5.3, 0.4, 0], [5.9, 2.2, 3]];
+    for (const [a, k, kind] of spots) {
+      const { info, mat } = treeKinds[kind], d = treeR + 4 + k * 8 + rnd() * 3, ang = a + rnd() * 0.35, sc = 0.85 + rnd() * 0.3;
+      const g = new THREE.PlaneGeometry(info.size_m * sc, info.size_m * sc);
+      const n = g.attributes.normal; for (let i = 0; i < n.count; i++) n.setXYZ(i, 0, 0.6, 0.8); // lit like a rounded crown, not a flat card
+      const mesh = new THREE.Mesh(g, mat); mesh.position.set(treeCentre.x + Math.cos(ang) * d, info.center_m * sc, treeCentre.z + Math.sin(ang) * d);
+      mesh.receiveShadow = true; treeGrp.add(noRay(mesh)); trees.push({ mesh, info, yaw: rnd() * Math.PI * 2 });
+      const r = info.size_m * sc * 0.42, sh = new THREE.Mesh(new THREE.PlaneGeometry(r * 2, r * 2), M.shadow); // soft shade under the crown
+      sh.rotation.x = -Math.PI / 2; sh.position.set(mesh.position.x, 0.015, mesh.position.z); sh.userData.rasterOnly = true; treeGrp.add(noRay(sh));
+    }
+    faceTrees();
+  }
+  /** turn each card to the camera and show the view of the tree rendered closest to this direction */
+  function faceTrees(): void {
+    for (const { mesh, info, yaw } of trees) {
+      const dx = cam.position.x - mesh.position.x, dz = cam.position.z - mesh.position.z, dy = cam.position.y - mesh.position.y;
+      mesh.rotation.y = Math.atan2(dx, dz);
+      const az = Math.atan2(-dz, dx) - yaw; // Blender azimuth: from +x towards +y (= three -z)
+      const col = ((Math.round(az / (2 * Math.PI / info.azimuths)) % info.azimuths) + info.azimuths) % info.azimuths;
+      const el = Math.atan2(dy, Math.hypot(dx, dz)) * 180 / Math.PI, E = info.elevations_deg;
+      const row = el > (E[0] + E[1]) / 2 ? 1 : 0, rows = E.length;
+      const u0 = col / info.cols, u1 = (col + 1) / info.cols, v1 = 1 - row / rows, v0 = 1 - (row + 1) / rows;
+      const uv = mesh.geometry.attributes.uv as THREE.BufferAttribute;
+      uv.setXY(0, u0, v1); uv.setXY(1, u1, v1); uv.setXY(2, u0, v0); uv.setXY(3, u1, v0); uv.needsUpdate = true;
+    }
+  }
+
   // ---------- build ----------
   let pickers: THREE.Mesh[] = [];
   function build(mods: Mod[], sel: Mod | null, bad: Set<Mod>, ds: Door[]): void {
@@ -414,6 +482,8 @@ export function createView3D(box: HTMLElement, host: View3DHost): View3D | null 
       sun.target.position.set(cx, 0, cz); sun.position.set(cx + sunDir.x * 60, sunDir.y * 60, cz + sunDir.z * 60);
       if (fx.on) Object.assign(sun.shadow.camera, { left: -rad, right: rad, top: rad, bottom: -rad, near: 60 - rad - 5, far: 60 + rad + 5 }); // shadow box fitted to the house
       sun.shadow.camera.updateProjectionMatrix();
+      const r0 = Math.hypot(x1 - x0, z1 - z0) / 2;
+      if (!treeCentre || treeCentre.distanceTo(new THREE.Vector3(cx, 0, cz)) + r0 > treeR + 4) { treeCentre = new THREE.Vector3(cx, 0, cz); treeR = r0; placeTrees(); }
     }
     const covered = (m: Mod) => mods.some(o => lv(o) === lv(m) + 1 && overlaps(fp(o), fp(m)));
     for (const m of mods) {
@@ -423,7 +493,7 @@ export function createView3D(box: HTMLElement, host: View3DHost): View3D | null 
       if (!deck && !covered(m)) noRay(boxAt(w + 0.04, 0.14, d + 0.04, M.cap, cx, y0 + hh + 0.05, cz, grp, fx.on ? 0.012 : 0)).castShadow = true; // roof flashing
       if (!deck && !lv(m)) {
         noRay(boxAt(w - 0.3, BASE, d - 0.3, M.plinth, cx, BASE / 2, cz, grp));
-        if (!fx.contact) { const sh = new THREE.Mesh(new THREE.PlaneGeometry(w + 1.6, d + 1.6), M.shadow); sh.rotation.x = -Math.PI / 2; sh.position.set(cx, 0.02, cz); grp.add(noRay(sh)); }
+        if (!fx.contact) { const sh = new THREE.Mesh(new THREE.PlaneGeometry(w + 1.6, d + 1.6), M.shadow); sh.userData.rasterOnly = true; sh.rotation.x = -Math.PI / 2; sh.position.set(cx, 0.02, cz); grp.add(noRay(sh)); }
       }
       // invisible box used for picking and for stacking
       const pick = new THREE.Mesh(new THREE.BoxGeometry(w, hh, d)); pick.visible = false; pick.position.set(cx, deck ? y0 - 0.07 : y0 + hh / 2, cz);
@@ -496,7 +566,7 @@ export function createView3D(box: HTMLElement, host: View3DHost): View3D | null 
   const tick = (now: number) => {
     const moved = controls.update();
     if (moved || dirty) {
-      dirty = false; post.render();
+      dirty = false; if (trees.length) faceTrees(); post.render();
       if (rendered) post.watch(now - last, now);
       rendered = true; last = now;
     } else rendered = false;
@@ -520,6 +590,77 @@ export function createView3D(box: HTMLElement, host: View3DHost): View3D | null 
     start() { cancelAnimationFrame(loop); invalidate(); loop = requestAnimationFrame(tick); },
     stop() { cancelAnimationFrame(loop); },
     setFinish(f) { applyFinish(f); },
+    canPhoto: () => !!envHdr,
+    async photo(mods, ds, o) {
+      if (!envHdr) return null;
+      cancelAnimationFrame(loop);
+      // the path tracer computes real shadows, bounce light and glass: the raster-only helpers come out
+      build(mods, null, new Set(), ds);
+      const hidden: THREE.Object3D[] = [];
+      scene.traverse(n => { if (n.userData.rasterOnly && n.visible) { n.visible = false; hidden.push(n); } });
+      const gridOn = grid.visible; grid.visible = false;
+      // The path tracer reads raw float vertex data: the kit's meshopt-quantized (normalized, interleaved) attributes are
+      // unpacked to plain floats for the photo, and tangents added (three r160 computes them only for indexed geometry).
+      const swapped: [THREE.Mesh, THREE.BufferGeometry][] = [];
+      grp.traverse(n => {
+        const mesh = n as THREE.Mesh, geo = mesh.geometry as THREE.BufferGeometry | undefined;
+        if (!mesh.isMesh || !geo) return;
+        let g = geo;
+        const packed = Object.values(geo.attributes).some(a => (a as THREE.InterleavedBufferAttribute).isInterleavedBufferAttribute || a.normalized || !(a.array instanceof Float32Array));
+        if (packed) {
+          g = new THREE.BufferGeometry(); g.index = geo.index; g.groups = geo.groups;
+          for (const [k, a] of Object.entries(geo.attributes)) {
+            const out = new Float32Array(a.count * a.itemSize);
+            const get = [a.getX, a.getY, a.getZ, a.getW];
+            for (let i = 0; i < a.count; i++) for (let c = 0; c < a.itemSize; c++) out[i * a.itemSize + c] = get[c].call(a, i);
+            g.setAttribute(k, new THREE.BufferAttribute(out, a.itemSize));
+          }
+        }
+        if (!g.attributes.tangent && g.attributes.uv && g.attributes.normal) {
+          if (g === geo) g = geo.clone();
+          if (g.index) g.computeTangents();
+          else { g.setIndex([...Array(g.attributes.position.count).keys()]); g.computeTangents(); g.setIndex(null); }
+        }
+        if (g !== geo) { swapped.push([mesh, geo]); mesh.geometry = g; }
+      });
+      // three-gpu-pathtracer 0.0.23 gives each mesh one material slot: multi-material meshes (walls) are split by group
+      const split: THREE.Mesh[] = [], unsplit: THREE.Mesh[] = [];
+      grp.traverse(n => { const mesh = n as THREE.Mesh; if (mesh.isMesh && mesh.visible && Array.isArray(mesh.material)) unsplit.push(mesh); });
+      for (const mesh of unsplit) {
+        const geo = mesh.geometry, mats = mesh.material as THREE.Material[];
+        for (const gr of geo.groups) {
+          const mat = mats[gr.materialIndex ?? 0]; if (!mat) continue;
+          const sub = new THREE.BufferGeometry();
+          for (const [k, a] of Object.entries(geo.attributes)) sub.setAttribute(k, a);
+          const idx: number[] = [], end = gr.start + gr.count;
+          for (let i = gr.start; i < end; i++) idx.push(geo.index ? geo.index.getX(i) : i);
+          sub.setIndex(idx);
+          const m = new THREE.Mesh(sub, mat); m.position.copy(mesh.position); m.quaternion.copy(mesh.quaternion); m.scale.copy(mesh.scale);
+          mesh.parent!.add(m); split.push(m);
+        }
+        mesh.visible = false;
+      }
+      const g = M.glass, keep = { color: g.color.clone(), opacity: g.opacity, transparent: g.transparent, blending: g.blending, roughness: g.roughness, metalness: g.metalness, transmission: g.transmission, ior: g.ior, depthWrite: g.depthWrite };
+      Object.assign(g, { opacity: 1, transparent: false, blending: THREE.NormalBlending, roughness: 0, metalness: 0, transmission: 1, ior: 1.52, depthWrite: true });
+      g.color.set(0xe9f1ef); // clear glass with a faint green edge tint
+      const env = scene.environment, pr = renderer.getPixelRatio();
+      scene.environment = envHdr;
+      renderer.setPixelRatio(1); setRenderSize(o.width, o.height);
+      try {
+        const { pathTrace } = await import('../fx/photo');
+        const r = await pathTrace(renderer, scene, cam, o, () => renderer.domElement.toDataURL('image/jpeg', 0.9));
+        return r.result;
+      } catch (e) { console.warn('Fotografia realista falhou', e); return null; }
+      finally {
+        for (const m of split) { m.removeFromParent(); m.geometry.dispose(); }
+        for (const m of unsplit) m.visible = true;
+        for (const [mesh, geo] of swapped) { mesh.geometry.dispose(); mesh.geometry = geo; }
+        scene.environment = env; Object.assign(g, keep); g.needsUpdate = true;
+        for (const n of hidden) n.visible = true;
+        grid.visible = gridOn; renderer.setPixelRatio(pr); resize();
+        host.changed(); loop = requestAnimationFrame(tick);
+      }
+    },
     capture(mods, bad, ds) {
       const p = cam.position.clone(), t = controls.target.clone();
       setRenderSize(960, 600); frame(mods); dolly(0.62);

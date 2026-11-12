@@ -36,7 +36,10 @@ Unidades: a planta está em decímetros (1 = 10 cm); a cena 3D em metros.
 
 - Luz por camadas, para qualquer combinação de módulos: céu HDRI (Poly Haven, CC0) com o sol desse céu a projetar sombras, AO dentro de cada módulo (pé da parede, cantos, ombreiras), sombras de contacto pintadas a partir da planta, GTAO só no nível `alto`, brilho interior por tipo de divisão.
 - Níveis: telemóveis, tablets e ecrãs pequenos ficam no nível `leve` (sem composer, pixel ratio até 1,5, sombras 1024). O 3D só desenha quando alguma coisa muda.
-- Para comparar: `?fx=0` (como era antes), `?fx=leve`, `?fx=alto`, `?fx=noao,nosky,nolook,nocontact`.
+- Nível `alto` tem ainda bloom (só luz muito acima do branco), SMAA e árvores à volta da casa (impostores renderizados em Cycles de árvores Poly Haven, CC0).
+- Cobertura, piso, plinto e pérgola com texturas reais (Poly Haven, CC0), UVs em metros.
+- **📷 Foto realista**: a vista 3D atual calculada com path tracing no navegador (`three-gpu-pathtracer`, MIT, carregado só quando se carrega no botão): sol, céu, luz refletida, sombras suaves e vidro real. 1600×1000 até 400 amostras ou 45 s no computador, 1200×750 até 30 s no telemóvel; "Parar e usar assim" aceita o que já tem. Pode descarregar-se, e a última fotografia da casa atual segue com o pedido de orçamento em vez da captura 3D normal.
+- Para comparar: `?fx=0` (como era antes), `?fx=leve`, `?fx=alto`, `?fx=noao,nosky,nolook,nocontact,nobloom,nosmaa,notrees`.
 - Mudar ou acrescentar uma textura: pôr a fonte em `assets/`, registar em `assets/assets.json` e correr `node scripts/compress-assets.mjs`. Só CC0 ou trabalho próprio vai para o site.
 
 ## Regras atuais

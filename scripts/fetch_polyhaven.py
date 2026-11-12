@@ -47,7 +47,7 @@ def main():
     src_root = os.path.dirname(o.manifest)
     for it in json.load(open(o.manifest, encoding='utf-8'))['items']:
         asset = it.get('polyhaven')
-        if not asset or o.only not in it['out']:
+        if not asset or it.get('impostor') or o.only not in it['out']:  # impostors are rendered in Blender, not downloaded
             continue
         files, res = api(asset), it.get('res', '1k')
         if it.get('hdri'):
