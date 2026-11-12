@@ -2,6 +2,7 @@
 // Env: RESEND_API_KEY, QUOTE_TO (sales address), QUOTE_FROM (verified sender; defaults to Resend's test sender).
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { detailsEmail, newRef, parseQuote, salesEmail } from '../src/model/quote.js';
+import { enqueue } from './_fila.js';
 
 const DEFAULT_FROM = 'TreeHouse Studio <onboarding@resend.dev>';
 
@@ -34,7 +35,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.error('Resend error', r.status, await r.text().catch(() => ''));
     return res.status(502).json({ error: 'Não foi possível enviar o pedido. Tente de novo dentro de momentos.' });
   }
-  return res.status(200).json({ ref });
+  // realistic photos: the request joins the queue that the Blender worker on Jular's PC renders
+  let fotos = false;
+  if (q.kind === 'pedido' && q.fotos && process.env.FOTOS_TOKEN && process.env.BLOB_READ_WRITE_TOKEN) {
+    try {
+      await enqueue({ ref, casa: q.casa, fachada: q.fachada, plan: q.plan, criado: new Date().toISOString() }, { nome: q.nome, email: q.email }, process.env.FOTOS_TOKEN);
+      fotos = true;
+    } catch (e) { console.error('Fila de fotos', e); }
+  }
+  return res.status(200).json({ ref, fotos });
 }
 
 function safeJson(s: string): unknown { try { return JSON.parse(s); } catch { return null; } }
