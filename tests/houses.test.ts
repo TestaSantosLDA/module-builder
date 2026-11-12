@@ -18,3 +18,17 @@ describe('catalogue houses', () => {
     });
   }
 });
+
+describe('placeHouse', () => {
+  it('maps join indices to module ids and copies outside walls', () => {
+    const h = { ...HOUSES[0], plan: [
+      { type: 'entrada', x: 0, y: 0, rot: 0, z: 0, out: { N: 'janelaP' }, join: { 1: 'aberto' } },
+      { type: 'quarto', x: 38, y: 0, rot: 0, z: 0 },
+    ] } as typeof HOUSES[0];
+    let n = 10;
+    const mods = placeHouse(h, () => n++);
+    expect(mods[0].join).toEqual({ 11: 'aberto' });
+    expect(mods[0].out).toEqual({ N: 'janelaP' });
+    expect(mods[0].out).not.toBe(h.plan[0].out);
+  });
+});
