@@ -580,6 +580,9 @@ function showPhoto(url: string): void {
   $('phClose').onclick = () => { $('modal').hidden = true; };
   $('phQuote').onclick = () => { $('modal').hidden = true; $('quote').click(); };
 }
+// The in-browser path tracer is not good enough for client images (Afonso, 2026-11-12): hidden until real renders arrive;
+// ?fx=foto shows it again for tests.
+if (!new URLSearchParams(location.search).get('fx')?.split(',').includes('foto')) $('photo').hidden = true;
 $('photo').onclick = () => void makePhoto();
 
 /** A JPEG small enough for the quote email (MAX_IMAGE_CHARS). */
