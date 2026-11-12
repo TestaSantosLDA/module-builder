@@ -88,6 +88,11 @@ function setPaletteOpen(open: boolean): void {
   palette.classList.toggle('collapsed', !open); pToggle.setAttribute('aria-expanded', String(open));
   try { localStorage.setItem('treehouse-pecas', open ? '1' : '0'); } catch { /* storage blocked */ }
 }
+// keep the parts menu clear of the summary panel on phones
+{
+  const sum = document.querySelector<HTMLElement>('.summary'), host = $('main');
+  if (sum && 'ResizeObserver' in window) new ResizeObserver(() => host.style.setProperty('--sum-h', sum.offsetHeight + 'px')).observe(sum);
+}
 pToggle.onclick = () => setPaletteOpen(palette.classList.contains('collapsed'));
 try { if (localStorage.getItem('treehouse-pecas') === '0') setPaletteOpen(false); } catch { /* storage blocked */ }
 
