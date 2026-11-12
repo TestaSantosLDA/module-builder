@@ -57,13 +57,14 @@
       </div>
       <p class="warn" id="warn" hidden></p>
       <button class="btn primary" id="quote">Pedir orçamento</button>
-      <div class="row"><button class="btn" id="example">Repor casa</button><button class="btn" id="clear">Limpar</button></div>
+      <div class="row"><button class="btn" id="photo" title="Fotografia realista da vista 3D, com luz real">📷 Foto realista</button><button class="btn" id="example">Repor casa</button><button class="btn" id="clear">Limpar</button></div>
     </aside>
 
     <div class="panel selbar" id="selbar" hidden>
       <button id="bUp" title="Subir um piso">▲ Piso</button><button id="bDown" title="Descer um piso">▼ Piso</button><button id="bRot">↻ Rodar</button><button id="bDup">Duplicar</button><button id="bStack" title="Pôr um módulo igual no piso de cima">＋ Em cima</button><button id="bDel">Apagar</button>
     </div>
 
+    <div class="photobusy" id="photoBusy" hidden role="status"><span id="photoMsg">A preparar a fotografia…</span><i><b id="photoBar"></b></i><button type="button" class="btn" id="photoStop">Parar e usar assim</button></div>
     <div class="modal" id="modal" hidden><div class="dialog" id="dlg" role="dialog" aria-modal="true" aria-labelledby="dlgTitle"></div></div>
   </main>
 </div>

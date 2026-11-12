@@ -2,7 +2,8 @@
 // AgX look contrast, look pass and GTAO settings). Two paths:
 //   leve: direct render to the canvas (MSAA from the canvas), AgX + look contrast in the material shaders. No extra
 //         render targets: cheapest on phones and tablets.
-//   alto: HDR composer (half float, MSAA 4) -> GTAO -> look (white balance + vignette) -> OutputPass (AgX + sRGB).
+//   alto: HDR composer (half float, MSAA 4) -> GTAO -> bloom (only light far above white) -> look (white balance +
+//         vignette) -> OutputPass (AgX + sRGB) -> SMAA. Bloom and SMAA are the apartment's settings.
 // fx.on = false keeps the old pipeline: ACES Filmic, no composer.
 import * as THREE from 'three';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
@@ -10,6 +11,8 @@ import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { GTAOPass } from 'three/examples/jsm/postprocessing/GTAOPass.js';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
+import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
+import { SMAAPass } from 'three/examples/jsm/postprocessing/SMAAPass.js';
 import type { Fx } from './quality';
 
 /** AgX with the "Medium High Contrast" look of the Cycles photos: three r160 has plain AgX only, so the log-encoded
@@ -39,6 +42,8 @@ void main() {
 
 export interface PostOptions {
   exposure?: number;
+  /** bloom strength, radius and threshold (linear, before exposure) */
+  bloom?: [number, number, number];
   /** GTAO radius in metres and blend strength */
   aoRadius?: number;
   aoIntensity?: number;
@@ -80,8 +85,13 @@ export function createPost(renderer: THREE.WebGLRenderer, scene: THREE.Scene, ca
     ao.blendIntensity = opts.aoIntensity ?? 0.85;
     composer.addPass(ao);
   }
+  if (fx.bloom) {
+    const [k, r, t] = opts.bloom ?? [0.12, 0.35, 2.5];
+    composer.addPass(new UnrealBloomPass(new THREE.Vector2(size.x, size.y), k, r, t));
+  }
   const look = new ShaderPass(LOOK_SHADER); look.enabled = fx.look; composer.addPass(look);
   composer.addPass(new OutputPass());
+  if (fx.smaa) composer.addPass(new SMAAPass(size.x, size.y));
   const watch = { from: performance.now() + 5000, times: [] as number[], until: 0 };
   return {
     composer,

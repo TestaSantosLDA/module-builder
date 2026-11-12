@@ -10,6 +10,8 @@ import { parsePlan } from './model/plan';
 import type { View3D } from './ui/view3d'; // the 3D code (three.js) is loaded only when the 3D tab is opened
 import { interior } from './ui/sketch';
 import { setupQuote } from './ui/quote';
+import { MAX_IMAGE_CHARS } from './model/quote';
+import { browserFx } from './fx/quality';
 
 const NS = 'http://www.w3.org/2000/svg';
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -526,12 +528,67 @@ for (const b of document.querySelectorAll<HTMLButtonElement>('#finish button[dat
   b.onclick = () => setFinish(b.dataset.f as Finish);
 }
 
+// ---------- "Fotografia realista" ----------
+// The current 3D view, path traced in the browser. The latest photo of the current plan and facade goes with the
+// quote request instead of the plain 3D capture.
+let lastPhoto: { url: string; key: string } | null = null;
+const photoKey = () => JSON.stringify(mods) + finish;
+const photoStop = { now: false };
+$('photoStop').onclick = () => { photoStop.now = true; };
+async function makePhoto(): Promise<void> {
+  if (!mods.length || !$('photoBusy').hidden) return;
+  if (!is3D) await setView(true);
+  const v = view3d; if (!v || !is3D) return;
+  const busy = $('photoBusy'), msg = $('photoMsg'), bar = $('photoBar');
+  busy.hidden = false; msg.textContent = 'A preparar a fotografia…'; bar.style.width = '0'; photoStop.now = false;
+  for (let i = 0; i < 100 && !v.canPhoto(); i++) await new Promise(r => setTimeout(r, 100)); // the sky is still loading
+  const leve = browserFx().tier === 'leve';
+  sel = null; render();
+  $('view3d').style.pointerEvents = 'none'; // the camera stays still while the photo is made
+  const test = (window as { __fotoTeste?: { width: number; height: number; samples: number; maxMs: number } }).__fotoTeste; // automated checks only
+  const url = await v.photo(mods, connections(mods), {
+    width: leve ? 1200 : 1600, height: leve ? 750 : 1000, samples: leve ? 160 : 400, maxMs: leve ? 30_000 : 45_000, ...test, stop: photoStop,
+    onProgress: p => { msg.textContent = `A criar a fotografia realista… ${Math.round(p * 100)} %`; bar.style.width = `${p * 100}%`; },
+  });
+  busy.hidden = true; $('view3d').style.pointerEvents = '';
+  if (!url) { alert('Não foi possível criar a fotografia neste navegador.'); return; }
+  lastPhoto = { url, key: photoKey() };
+  showPhoto(url);
+}
+function showPhoto(url: string): void {
+  const dlg = $('dlg');
+  dlg.className = 'dialog wide';
+  dlg.innerHTML = `<h3 id="dlgTitle">Fotografia realista</h3>
+  <img class="shot" src="${url}" alt="Fotografia realista da casa">
+  <p>Calculada no seu navegador com luz real: sol, céu, sombras suaves e reflexos no vidro. Esta fotografia segue com o pedido de orçamento enquanto não mudar a casa.</p>
+  <div class="row"><a class="btn" id="phDown" download="treehouse-studio.jpg" href="${url}">Descarregar</a><button type="button" class="btn" id="phClose">Fechar</button><button type="button" class="btn primary" id="phQuote">Pedir orçamento</button></div>`;
+  $('modal').hidden = false;
+  $('phClose').onclick = () => { $('modal').hidden = true; };
+  $('phQuote').onclick = () => { $('modal').hidden = true; $('quote').click(); };
+}
+$('photo').onclick = () => void makePhoto();
+
+/** A JPEG small enough for the quote email (MAX_IMAGE_CHARS). */
+async function shrink(url: string, maxChars: number): Promise<string> {
+  if (url.length <= maxChars) return url;
+  const img = new Image(); img.src = url; await img.decode();
+  for (const [w, q] of [[1280, 0.85], [1100, 0.8], [960, 0.75]] as const) {
+    const c = document.createElement('canvas'); c.width = w; c.height = Math.round(img.height * w / img.width);
+    c.getContext('2d')!.drawImage(img, 0, 0, c.width, c.height);
+    const out = c.toDataURL('image/jpeg', q); if (out.length <= maxChars) return out;
+  }
+  return '';
+}
+
 // ---------- quote request ----------
 setupQuote({
   getMods: () => mods,
   finish: () => finish,
   house: () => houseId,
-  capture: async () => (await ensure3D())?.capture(mods, problems(mods).bad, connections(mods)) ?? null,
+  capture: async () => {
+    if (lastPhoto && lastPhoto.key === photoKey()) { const u = await shrink(lastPhoto.url, MAX_IMAGE_CHARS); if (u) return u; }
+    return (await ensure3D())?.capture(mods, problems(mods).bad, connections(mods)) ?? null;
+  },
 });
 
 // ---------- undo + persistence ----------
