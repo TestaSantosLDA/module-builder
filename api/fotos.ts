@@ -2,7 +2,7 @@
 //   GET  /api/fotos?fila=1                 waiting requests (no client data)
 //   POST /api/fotos?entregar=<ref>         { images: [{ name, data: base64 JPEG }] } → emailed, request removed
 //   POST /api/fotos?falhou=<ref>           { erro } → the Jular team is told, request kept
-// All need "Authorization: Bearer <FOTOS_TOKEN>".
+// All need "Authorization: Bearer <FOTOS_TOKEN>" (set in Vercel 2026-11-13; the PC worker reads it from .fotos_token).
 // Env: FOTOS_TOKEN, BLOB_READ_WRITE_TOKEN (Vercel Blob), RESEND_API_KEY, QUOTE_TO, QUOTE_FROM,
 //      FOTOS_CLIENTE=1 once the sender domain is verified (photos go straight to the client; before that, to QUOTE_TO).
 import type { VercelRequest, VercelResponse } from '@vercel/node';
