@@ -462,6 +462,28 @@ function showHouse(): void {
   const h = houseById(houseId)!;
   for (const b of housesBox.querySelectorAll<HTMLButtonElement>('button')) b.setAttribute('aria-pressed', String(b.dataset.house === houseId));
   $('houseNote').textContent = `${h.name} (${h.catalogArea}, catálogo p. ${h.page}), partida nas suas peças.`;
+  // realistic photos of the catalogue house as built (Blender renders, public/fotos); a missing file hides its thumbnail
+  const box = $('houseFotos'); box.innerHTML = '';
+  FOTO_VIEWS.forEach(([v, label], i) => {
+    const b = document.createElement('button'); b.type = 'button'; b.title = `Fotografia realista: ${label.toLowerCase()}`;
+    const img = document.createElement('img'); img.loading = 'lazy'; img.alt = `${h.name}, ${label.toLowerCase()}`; img.src = `/fotos/${h.id}_${v}_p.webp`;
+    img.onerror = () => b.remove();
+    b.appendChild(img); b.onclick = () => showHousePhoto(h.id, h.name, i); box.appendChild(b);
+  });
+}
+const FOTO_VIEWS = [['frente', 'Exterior'], ['deck', 'Deck'], ['interior', 'Interior']] as const;
+function showHousePhoto(id: string, name: string, i: number): void {
+  const dlg = $('dlg');
+  dlg.className = 'dialog wide';
+  dlg.innerHTML = `<h3 id="dlgTitle">${name}</h3>
+  <div class="fototabs">${FOTO_VIEWS.map(([, l], k) => `<button type="button" class="btn${k === i ? ' primary' : ''}" data-k="${k}">${l}</button>`).join('')}</div>
+  <img class="shot" src="/fotos/${id}_${FOTO_VIEWS[i][0]}.webp" alt="${name}, ${FOTO_VIEWS[i][1].toLowerCase()}">
+  <p>Fotografia realista da casa do catálogo, com fachada branca. Se mudar a casa, peça fotografias da sua versão em "📷 Fotos realistas".</p>
+  <div class="row"><button type="button" class="btn" id="hfClose">Fechar</button><button type="button" class="btn primary" id="hfAsk">📷 Fotos da minha casa</button></div>`;
+  $('modal').hidden = false;
+  dlg.querySelectorAll<HTMLButtonElement>('.fototabs button').forEach(b => { b.onclick = () => showHousePhoto(id, name, Number(b.dataset.k)); });
+  $('hfClose').onclick = () => { $('modal').hidden = true; };
+  $('hfAsk').onclick = () => { $('modal').hidden = true; $('photo').click(); };
 }
 function loadHouse(id: string): void {
   const h = houseById(id); if (!h) return;
