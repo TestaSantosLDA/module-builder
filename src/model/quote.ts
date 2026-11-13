@@ -22,6 +22,8 @@ export interface QuoteRequest {
   image?: string;
   /** honeypot: real people leave it empty */
   website?: string;
+  /** the client also wants realistic photos of this house by email (rendered in Blender) */
+  fotos?: boolean;
 }
 
 export interface QuoteDetails {
@@ -58,7 +60,7 @@ export function parseQuote(body: unknown): Parsed<QuoteRequest | QuoteDetails> {
   let image: string | undefined;
   if (typeof b.image === 'string' && b.image.startsWith('data:image/jpeg;base64,') && b.image.length <= MAX_IMAGE_CHARS) image = b.image;
   const casa = houseById(str(b.casa, 40))?.id ?? DEFAULT_HOUSE;
-  return { ok: true, value: { kind: 'pedido', nome, email, tel: str(b.tel, 40), rgpd: true, fachada, casa, plan, image, website: str(b.website, 200) } };
+  return { ok: true, value: { kind: 'pedido', nome, email, tel: str(b.tel, 40), rgpd: true, fachada, casa, plan, image, website: str(b.website, 200), fotos: b.fotos === true } };
 }
 
 /** Request reference, e.g. TH-261111-K3QZ. */
@@ -84,12 +86,14 @@ export function salesEmail(q: QuoteRequest, ref: string): Email {
 <p>Um cliente montou uma casa no TreeHouse Studio e pediu orçamento. Responder em até 2 dias úteis.</p>
 ${h5('Cliente')}${table(row('Nome', q.nome) + row('Email', q.email) + row('Telefone', q.tel || 'não indicado'))}
 ${h5('Casa')}${table(row('Ponto de partida', houseById(q.casa)?.name ?? '-') + s.rows.map(r => row('Piso ' + r.level, r.items.join(', '))).join('') + row('Área interior', s.area + ' m²') + row('Deck', s.deck + ' m²') + row('Portas criadas', String(s.doors)) + row('Janelas e portas', s.openings.join(', ')) + row('Fachada', FINISH_NAMES[q.fachada]))}
+${q.fotos ? '<p style="background:#eef6ff;border-left:3px solid #3f7fd9;padding:8px 10px;font-size:13px;margin-top:10px">O cliente pediu <b>fotos realistas</b> desta casa (render Blender no PC; chegam por email).</p>' : ''}
 ${s.msgs.length ? `<p style="background:#fff4ef;border-left:3px solid #d9573f;padding:8px 10px;font-size:13px;margin-top:10px"><b>A planta tem avisos:</b> ${esc(s.msgs.join(' '))}</p>` : ''}
 <p style="font-size:13px;color:#5d6b7a">Em anexo: ${q.image ? 'vista 3D da casa e ' : ''}a planta (planta.json) para reabrir no TreeHouse Studio.</p>
 ${h5('Próximos passos sugeridos')}<ol style="margin:0;padding-left:18px"><li>Ligar ao cliente e confirmar terreno, acessos de camião e grua, e acabamentos.</li><li>Validar a planta com a equipa técnica (módulos, cargas, escadas).</li><li>Enviar o orçamento com mapa de medições.</li></ol>
 </div>`;
   const text = [`Novo pedido ${ref}`, '', `Nome: ${q.nome}`, `Email: ${q.email}`, `Telefone: ${q.tel || 'não indicado'}`, '',
     ...s.rows.map(r => `Piso ${r.level}: ${r.items.join(', ')}`), `Área interior: ${s.area} m²`, `Deck: ${s.deck} m²`, `Janelas e portas: ${s.openings.join(', ') || '-'}`, `Fachada: ${FINISH_NAMES[q.fachada]}`,
+    ...(q.fotos ? ['', 'O cliente pediu fotos realistas (render Blender no PC).'] : []),
     ...(s.msgs.length ? ['', 'Avisos: ' + s.msgs.join(' ')] : [])].join('\n');
   return { subject, html, text };
 }
@@ -102,5 +106,20 @@ export function detailsEmail(d: QuoteDetails): Email {
     subject,
     html: `<div style="font:14px/1.5 Arial,Helvetica,sans-serif;color:#1d2733;max-width:640px"><p>O cliente acrescentou detalhes ao pedido ${esc(d.ref)}.</p>${table(rows)}</div>`,
     text: [`Detalhes do pedido ${d.ref}`, `Email: ${d.email}`, `Concelho: ${d.concelho || '-'}`, `Terreno: ${d.terreno || '-'}`, `Uso: ${d.uso || '-'}`].join('\n'),
+  };
+}
+
+/**
+ * Email with the realistic photos. `direct`: to the client; otherwise to the Jular team to forward (until the sender
+ * domain is verified in Resend, it only delivers to the account owner).
+ */
+export function photosEmail(ref: string, nome: string, email: string, direct: boolean): Email {
+  const first = nome.split(' ')[0] || '';
+  const body = `<p>Olá ${esc(first)},</p><p>Em anexo estão as fotografias realistas da casa que montou no TreeHouse Studio (pedido ${esc(ref)}), calculadas com a luz do sol, do céu e os materiais reais da Jular.</p><p>Um consultor Jular vai contactá-lo para falar do terreno e dos acabamentos. Se quiser mudar alguma coisa, pode voltar ao TreeHouse Studio e pedir novas fotografias.</p><p>Equipa Jular</p>`;
+  const note = direct ? '' : `<p style="background:#fff8e6;border-left:3px solid #d9a03f;padding:8px 10px;font-size:13px">Reencaminhar para <b>${esc(nome)}</b> &lt;${esc(email)}&gt; (o envio direto ao cliente fica ativo quando o domínio estiver verificado no Resend).</p>`;
+  return {
+    subject: direct ? `As fotografias da sua casa TreeHouse (${ref})` : `Fotos realistas ${ref} para ${nome} <${email}> · reencaminhar`,
+    html: `<div style="font:14px/1.5 Arial,Helvetica,sans-serif;color:#1d2733;max-width:640px">${note}${body}</div>`,
+    text: [direct ? '' : `Reencaminhar para ${nome} <${email}>`, `Olá ${first},`, `Em anexo estão as fotografias realistas da casa que montou no TreeHouse Studio (pedido ${ref}).`, 'Equipa Jular'].filter(Boolean).join('\n\n'),
   };
 }
