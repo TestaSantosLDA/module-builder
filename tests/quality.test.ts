@@ -4,7 +4,9 @@ import { readFx } from '../src/fx/quality';
 describe('quality tiers', () => {
   it('desktop gets the full tier with every effect', () => {
     const fx = readFx('', false, 1440, 900);
-    expect(fx).toMatchObject({ on: true, tier: 'alto', ao: true, sky: true, look: true, contact: true, bloom: true, smaa: true, trees: true, furniture: true, maxPixelRatio: 2 });
+    expect(fx).toMatchObject({ on: true, tier: 'alto', ao: true, sky: true, look: true, contact: true, bloom: true, smaa: true, trees: false, world: false, furniture: true, maxPixelRatio: 2 });
+    expect(readFx('?fx=mundo', false, 1440, 900)).toMatchObject({ sky: true, world: true, trees: true });
+    expect(readFx('?fx=mundo,nosky', false, 1440, 900)).toMatchObject({ world: false, trees: false });
   });
   it('touch screens get the light tier without screen-space AO', () => {
     const fx = readFx('', true, 1180, 820);
