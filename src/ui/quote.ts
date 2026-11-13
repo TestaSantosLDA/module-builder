@@ -14,6 +14,11 @@ export interface QuoteHost {
 
 const ENDPOINT = '/api/quote';
 
+// Realistic photos by email are switched off (Afonso, 2026-11-13: the renders are not good enough to show a client;
+// the pipeline is to be rethought). The queue, /api/fotos and the PC worker stay as they are. ?fx=pedirfotos shows
+// the request again, for tests.
+export const FOTOS_ON = new URLSearchParams(location.search).get('fx')?.split(',').includes('pedirfotos') ?? false;
+
 async function post(body: unknown): Promise<{ ref?: string; error?: string; fotos?: boolean }> {
   try {
     const r = await fetch(ENDPOINT, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
@@ -49,7 +54,7 @@ export function setupQuote(host: QuoteHost): void {
     <label>Email<input id="qEmail" type="email" required autocomplete="email" maxlength="200" value="${esc(lead.email)}"></label>
     <label>Telefone (opcional)<input id="qTel" type="tel" autocomplete="tel" maxlength="40" value="${esc(lead.tel)}"></label>
     <label class="hp" aria-hidden="true">Website<input id="qSite" tabindex="-1" autocomplete="off"></label>
-    <label class="check"><input type="checkbox" id="qFotos" ${fotos || lead.fotos ? 'checked' : ''}> Quero receber 3 fotografias realistas desta casa por email.</label>
+    <label class="check"${FOTOS_ON ? '' : ' hidden'}><input type="checkbox" id="qFotos" ${FOTOS_ON && (fotos || lead.fotos) ? 'checked' : ''}> Quero receber 3 fotografias realistas desta casa por email.</label>
     <label class="check"><input type="checkbox" id="qRgpd" required> Aceito que a Jular me contacte sobre este pedido e trate estes dados para esse fim.</label>
     <p class="err" id="qErr" role="alert" hidden></p>
     <div class="row"><button type="button" class="btn" id="qBack">Continuar a construir</button><button class="btn primary" id="qSend">Enviar pedido</button></div>
@@ -101,6 +106,7 @@ export function setupQuote(host: QuoteHost): void {
   }
 
   document.getElementById('quote')!.onclick = () => open(false);
-  document.getElementById('photo')!.onclick = () => open(true);
+  const photo = document.getElementById('photo')!;
+  photo.hidden = !FOTOS_ON; photo.onclick = () => open(true);
   modal.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
 }

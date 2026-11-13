@@ -153,28 +153,35 @@ export function createView3D(box: HTMLElement, host: View3DHost): View3D | null 
   let envHdr: THREE.Texture | null = null;
   const grid = new THREE.Group();
   for (const [n, c1, c2, y] of [[200, 0x5f86ad, 0x2a5580, 0.005], [40, 0x8fb3d6, 0x8fb3d6, 0.01]] as const) {
-    const g = new THREE.GridHelper(200, n, c1, c2); g.position.y = y; (g.material as THREE.Material).transparent = true; (g.material as THREE.Material).opacity = fx.sky ? 0.22 : 0.35; grid.add(g);
+    const g = new THREE.GridHelper(200, n, c1, c2); g.position.y = y; (g.material as THREE.Material).transparent = true; (g.material as THREE.Material).opacity = fx.world ? 0.22 : 0.35; grid.add(g);
   }
   scene.add(grid);
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(400, 400), new THREE.MeshStandardMaterial({ color: css('--paper-deep'), roughness: 1, envMapIntensity: 0.15 }));
   ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; scene.add(ground);
   if (fx.sky) {
-    grid.visible = false; // the plan grid only shows while a module is being dragged
-    scene.background = new THREE.Color(0xb9c9d8);
-    scene.fog = new THREE.Fog(0xb9c9d8, 90, 200);
-    const gm = ground.material as THREE.MeshStandardMaterial;
-    Object.assign(gm, { color: new THREE.Color(0xffffff), envMapIntensity: 1 });
-    // colour from an aerial scan (one tile = 9 m: no visible repeats), relief and roughness from a close-up (2.6 m)
-    const C = 400 / 9, R = 400 / 2.6;
-    void Promise.all([ktxTex('relva/campo_cor.ktx2', true, C, C), ktxTex('relva/relva_nor.ktx2', false, R, R), ktxTex('relva/relva_arm.ktx2', false, R, R)]).then(([c, n, arm]) => {
-      Object.assign(gm, { map: c, normalMap: n, normalScale: new THREE.Vector2(0.8, 0.8), aoMap: arm, roughnessMap: arm }); gm.needsUpdate = true; invalidate();
-    }).catch(e => console.warn('Relva não carregou', e));
+    // Blueprint by default (Afonso, 2026-11-13): paper background and plan grid, with the light of the real sky on the
+    // house. ?fx=mundo brings back the simulated surroundings (sky backdrop, grass, haze, trees).
+    if (fx.world) {
+      grid.visible = false; // the plan grid only shows while a module is being dragged
+      scene.background = new THREE.Color(0xb9c9d8);
+      scene.fog = new THREE.Fog(0xb9c9d8, 90, 200);
+      const gm = ground.material as THREE.MeshStandardMaterial;
+      Object.assign(gm, { color: new THREE.Color(0xffffff), envMapIntensity: 1 });
+      // colour from an aerial scan (one tile = 9 m: no visible repeats), relief and roughness from a close-up (2.6 m)
+      const C = 400 / 9, R = 400 / 2.6;
+      void Promise.all([ktxTex('relva/campo_cor.ktx2', true, C, C), ktxTex('relva/relva_nor.ktx2', false, R, R), ktxTex('relva/relva_arm.ktx2', false, R, R)]).then(([c, n, arm]) => {
+        Object.assign(gm, { map: c, normalMap: n, normalScale: new THREE.Vector2(0.8, 0.8), aoMap: arm, roughnessMap: arm }); gm.needsUpdate = true; invalidate();
+      }).catch(e => console.warn('Relva não carregou', e));
+    } else {
+      scene.background = new THREE.Color(css('--paper'));
+      scene.fog = new THREE.Fog(css('--paper'), 60, 140);
+    }
     void fetch(host.kitUrl + 'ceu/ceu.json').then(r => r.json()).then((info: { bgScale: number; horizon: number[]; sun: number[]; sunIrradiance: number }) => {
       sunDir.fromArray(info.sun).normalize();
       sun.color.set(0xffffff); sun.intensity = info.sunIrradiance;
       const haze = new THREE.Color().setRGB(info.horizon[0], info.horizon[1], info.horizon[2], THREE.LinearSRGBColorSpace);
-      (scene.fog as THREE.Fog).color.copy(haze);
-      new THREE.TextureLoader().load(host.kitUrl + 'ceu/ceu_fundo.jpg', t => {
+      if (fx.world) (scene.fog as THREE.Fog).color.copy(haze);
+      if (fx.world) new THREE.TextureLoader().load(host.kitUrl + 'ceu/ceu_fundo.jpg', t => {
         t.mapping = THREE.EquirectangularReflectionMapping; t.colorSpace = THREE.SRGBColorSpace;
         scene.background = t; scene.backgroundIntensity = info.bgScale; invalidate();
       });
@@ -206,7 +213,7 @@ export function createView3D(box: HTMLElement, host: View3DHost): View3D | null 
     shadow: new THREE.MeshBasicMaterial({ map: blobTexture(), transparent: true, depthWrite: false }),
     cap: new THREE.MeshStandardMaterial({ color: 0x33383f, roughness: 0.5, metalness: 0.4 }),
     roof: new THREE.MeshStandardMaterial({ color: 0x3d434a, roughness: 0.95 }),
-    plinth: new THREE.MeshStandardMaterial({ color: fx.sky ? 0x6f6c66 : 0x1c2530, roughness: 1 }),
+    plinth: new THREE.MeshStandardMaterial({ color: fx.world ? 0x6f6c66 : 0x1c2530, roughness: 1 }),
     plaster: withModuleAO(new THREE.MeshStandardMaterial({ color: 0xefebe4, roughness: 0.95, envMapIntensity: fx.on ? 0.45 : 1 }), 'int'),
     floor: withModuleAO(new THREE.MeshStandardMaterial({ color: 0x9a6b43, roughness: 0.55, envMapIntensity: fx.on ? 0.45 : 1 }), 'int'),
     ceil: withModuleAO(new THREE.MeshStandardMaterial({ color: 0xf4f1ec, roughness: 0.95, side: THREE.DoubleSide, envMapIntensity: fx.on ? 0.45 : 1 }), 'int'),
@@ -580,7 +587,7 @@ export function createView3D(box: HTMLElement, host: View3DHost): View3D | null 
   const ray = new THREE.Raycaster(), ndc = new THREE.Vector2(), groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
   let drag: { m: Mod; moved: boolean; side?: 'N' | 'S' | 'W' | 'E'; at?: THREE.Vector3 } | null = null;
   let press: { x: number; y: number } | null = null;
-  const showGrid = (on: boolean) => { if (fx.sky && grid.visible !== on) { grid.visible = on; invalidate(); } };
+  const showGrid = (on: boolean) => { if (fx.world && grid.visible !== on) { grid.visible = on; invalidate(); } };
   const aim = (x: number, y: number) => { const r = renderer.domElement.getBoundingClientRect(); ndc.set((x - r.left) / r.width * 2 - 1, -(y - r.top) / r.height * 2 + 1); ray.setFromCamera(ndc, cam); };
   function place(m: Mod, x: number, y: number): void {
     aim(x, y); showGrid(true);

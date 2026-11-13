@@ -9,7 +9,7 @@ import { DEFAULT_HOUSE, FAMILIES, HOUSES, houseById, placeHouse } from './model/
 import { parsePlan } from './model/plan';
 import type { View3D } from './ui/view3d'; // the 3D code (three.js) is loaded only when the 3D tab is opened
 import { interior } from './ui/sketch';
-import { setupQuote } from './ui/quote';
+import { FOTOS_ON, setupQuote } from './ui/quote';
 import { MAX_IMAGE_CHARS } from './model/quote';
 import { browserFx } from './fx/quality';
 
@@ -478,12 +478,12 @@ function showHousePhoto(id: string, name: string, i: number): void {
   dlg.innerHTML = `<h3 id="dlgTitle">${name}</h3>
   <div class="fototabs">${FOTO_VIEWS.map(([, l], k) => `<button type="button" class="btn${k === i ? ' primary' : ''}" data-k="${k}">${l}</button>`).join('')}</div>
   <img class="shot" src="/fotos/${id}_${FOTO_VIEWS[i][0]}.webp" alt="${name}, ${FOTO_VIEWS[i][1].toLowerCase()}">
-  <p>Fotografia realista da casa do catálogo, com fachada branca. Se mudar a casa, peça fotografias da sua versão em "📷 Fotos realistas".</p>
-  <div class="row"><button type="button" class="btn" id="hfClose">Fechar</button><button type="button" class="btn primary" id="hfAsk">📷 Fotos da minha casa</button></div>`;
+  <p>Fotografia realista da casa do catálogo, com fachada branca.${FOTOS_ON ? ' Se mudar a casa, peça fotografias da sua versão em "📷 Fotos realistas".' : ''}</p>
+  <div class="row"><button type="button" class="btn" id="hfClose">Fechar</button>${FOTOS_ON ? '<button type="button" class="btn primary" id="hfAsk">📷 Fotos da minha casa</button>' : ''}</div>`;
   $('modal').hidden = false;
   dlg.querySelectorAll<HTMLButtonElement>('.fototabs button').forEach(b => { b.onclick = () => showHousePhoto(id, name, Number(b.dataset.k)); });
   $('hfClose').onclick = () => { $('modal').hidden = true; };
-  $('hfAsk').onclick = () => { $('modal').hidden = true; $('photo').click(); };
+  if (FOTOS_ON) $('hfAsk').onclick = () => { $('modal').hidden = true; $('photo').click(); };
 }
 function loadHouse(id: string): void {
   const h = houseById(id); if (!h) return;

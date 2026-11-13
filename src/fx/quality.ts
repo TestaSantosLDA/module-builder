@@ -1,6 +1,7 @@
 // Quality tiers and effect switches, read from the URL. Same flags as the apartment walkthrough (web/viewer.js):
 //   ?fx=0                 everything off (the 3D as before: studio light, paper background, no post-processing)
 //   ?fx=leve | ?fx=alto   force a tier (default: phones/tablets and small screens get "leve")
+//   ?fx=mundo             simulated surroundings (sky, grass, trees); the default background is the blueprint
 //   ?fx=noao,nosky,nolook,nocontact,nobloom,nosmaa,notrees,nomob   turn single effects off (comma-separated)
 export type Tier = 'leve' | 'alto';
 export interface Fx {
@@ -8,8 +9,10 @@ export interface Fx {
   tier: Tier;
   /** screen-space ambient occlusion (GTAO): desktop tier only */
   ao: boolean;
-  /** HDRI sky, sky light and grass ground */
+  /** light from the HDRI sky and its sun (the materials look right); the background stays the blueprint unless `world` */
   sky: boolean;
+  /** ?fx=mundo: simulated surroundings (sky backdrop, grass, haze, trees) instead of the blueprint paper and grid */
+  world: boolean;
   /** AgX "photo look" contrast + vignette */
   look: boolean;
   /** baked per-module AO and contact shadows (cheap, every tier) */
@@ -35,11 +38,12 @@ export function readFx(search: string, coarsePointer: boolean, width: number, he
     on, tier,
     ao: on && tier === 'alto' && !args.has('noao'),
     sky: on && !args.has('nosky'),
+    world: on && !args.has('nosky') && args.has('mundo'),
     look: on && !args.has('nolook'),
     contact: on && !args.has('nocontact'),
     bloom: on && tier === 'alto' && !args.has('nobloom'),
     smaa: on && tier === 'alto' && !args.has('nosmaa'),
-    trees: on && tier === 'alto' && !args.has('nosky') && !args.has('notrees'),
+    trees: on && tier === 'alto' && !args.has('nosky') && args.has('mundo') && !args.has('notrees'),
     furniture: on && !args.has('nomob'),
     maxPixelRatio: tier === 'leve' ? 1.5 : 2,
     shadowMapSize: tier === 'leve' ? 1024 : 2048,
